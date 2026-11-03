@@ -4,7 +4,7 @@
 [![React](https://img.shields.io/badge/React-19.3.0-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
 
 > **Plataforma web moderna, intuitiva y segura para coordinar horarios y encontrar el mejor momento para reunirse en grupo, sin necesidad de registros obligatorios ni formularios engorrosos.**
 
@@ -182,4 +182,4 @@ disponibilidad_horarios/
 
 ## 📄 Licencia
 
-Este proyecto se encuentra bajo la licencia [MIT](LICENSE). Siéntete libre de utilizarlo, modificarlo y adaptarlo a tus necesidades.
+Este proyecto está licenciado bajo la **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**. Puedes consultar el texto completo en el archivo [LICENSE](LICENSE) para obtener más información sobre los derechos y libertades que otorga el software libre.
