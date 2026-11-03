@@ -29,17 +29,24 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
 
   const [activeTab, setActiveTab] = useState<'my-schedule' | 'group-schedule'>('my-schedule');
   const [participantName, setParticipantName] = useState('');
+  const [localSlots, setLocalSlots] = useState<string[]>([]);
   const [highlightedParticipant, setHighlightedParticipant] = useState<Participant | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [notification, setNotification] = useState<{ message: string; showSwitchTab?: boolean } | null>(null);
 
-  // Restore remembered participant name for this event
+  // Restore remembered participant name and slots for this event
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedName = localStorage.getItem(`disponi_name_${event.id}`);
       if (savedName) {
         setParticipantName(savedName);
+      }
+      const rawSlots = localStorage.getItem(`disponi_slots_${event.id}`);
+      if (rawSlots) {
+        try {
+          setLocalSlots(JSON.parse(rawSlots));
+        } catch {}
       }
     }
   }, [event.id]);
@@ -73,6 +80,15 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
           name: participantName.trim(),
           slots,
           participantId: currentParticipant?.id,
+          event: {
+            title: event.title,
+            description: event.description,
+            type: event.type,
+            dates: event.dates,
+            startHour: event.startHour,
+            endHour: event.endHour,
+            slotDuration: event.slotDuration,
+          },
         }),
       });
 
@@ -83,11 +99,38 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
 
       if (json.updatedData) {
         setData(json.updatedData);
+      } else {
+        // Fallback optimistic update
+        const updatedParticipants = [...participants];
+        const existingIdx = updatedParticipants.findIndex(
+          (p) => p.name.trim().toLowerCase() === participantName.trim().toLowerCase()
+        );
+        if (existingIdx >= 0) {
+          updatedParticipants[existingIdx] = {
+            ...updatedParticipants[existingIdx],
+            slots,
+            updatedAt: new Date().toISOString(),
+          };
+        } else {
+          updatedParticipants.push({
+            id: json.participant?.id || String(Date.now()),
+            eventId: event.id,
+            name: participantName.trim(),
+            slots,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        setData((prev) => ({
+          ...prev,
+          participants: updatedParticipants,
+        }));
       }
 
-      // Save name to localStorage
+      // Save name & slots to localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem(`disponi_name_${event.id}`, participantName.trim());
+        localStorage.setItem(`disponi_slots_${event.id}`, JSON.stringify(slots));
       }
 
       setNotification({
@@ -334,7 +377,7 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
                 <AvailabilityGrid
                   event={event}
                   timeSlots={timeSlots}
-                  initialSlots={currentParticipant ? currentParticipant.slots : []}
+                  initialSlots={currentParticipant ? currentParticipant.slots : localSlots}
                   participantName={participantName}
                   onSave={handleSaveAvailability}
                   isSaving={isSaving}

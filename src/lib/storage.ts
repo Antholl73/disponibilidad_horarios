@@ -3,24 +3,26 @@ import { getDatabase } from '@/lib/db';
 import { Event, EventType, Participant } from '@/types';
 import crypto from 'node:crypto';
 
-// Check if Upstash Redis credentials are provided
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+function getRedisClient(): Redis | null {
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
-let redisClient: Redis | null = null;
-if (redisUrl && redisToken) {
-  try {
-    redisClient = new Redis({
-      url: redisUrl,
-      token: redisToken,
-    });
-  } catch (err) {
-    console.warn('No se pudo inicializar Redis de Upstash, recurriendo a almacenamiento local:', err);
+  if (redisUrl && redisToken) {
+    try {
+      return new Redis({
+        url: redisUrl,
+        token: redisToken,
+      });
+    } catch (err) {
+      console.warn('No se pudo inicializar Redis de Upstash, recurriendo a almacenamiento local:', err);
+      return null;
+    }
   }
+  return null;
 }
 
 export function isCloudStorageEnabled(): boolean {
-  return redisClient !== null;
+  return getRedisClient() !== null;
 }
 
 // -------------------------------------------------------------
@@ -28,8 +30,9 @@ export function isCloudStorageEnabled(): boolean {
 // -------------------------------------------------------------
 
 export async function saveEventRecord(event: Event): Promise<void> {
-  if (redisClient) {
-    await redisClient.set(`event:${event.id}`, JSON.stringify(event));
+  const redis = getRedisClient();
+  if (redis) {
+    await redis.set(`event:${event.id}`, JSON.stringify(event));
     return;
   }
 
@@ -54,8 +57,9 @@ export async function saveEventRecord(event: Event): Promise<void> {
 }
 
 export async function getEventRecord(id: string): Promise<Event | null> {
-  if (redisClient) {
-    const raw = await redisClient.get<string | Event>(`event:${id}`);
+  const redis = getRedisClient();
+  if (redis) {
+    const raw = await redis.get<string | Event>(`event:${id}`);
     if (!raw) return null;
     return typeof raw === 'string' ? JSON.parse(raw) : raw;
   }
@@ -95,8 +99,9 @@ export async function getEventRecord(id: string): Promise<Event | null> {
 // -------------------------------------------------------------
 
 export async function getParticipantsRecord(eventId: string): Promise<Participant[]> {
-  if (redisClient) {
-    const raw = await redisClient.get<string | Participant[]>(`participants:${eventId}`);
+  const redis = getRedisClient();
+  if (redis) {
+    const raw = await redis.get<string | Participant[]>(`participants:${eventId}`);
     if (!raw) return [];
     return typeof raw === 'string' ? JSON.parse(raw) : raw;
   }
@@ -131,8 +136,9 @@ export async function saveParticipantRecord(
 ): Promise<Participant> {
   const trimmedName = name.trim();
   const now = new Date().toISOString();
+  const redis = getRedisClient();
 
-  if (redisClient) {
+  if (redis) {
     const participants = await getParticipantsRecord(eventId);
     let existingIndex = -1;
 
@@ -153,7 +159,7 @@ export async function saveParticipantRecord(
         updatedAt: now,
       };
       participants[existingIndex] = updated;
-      await redisClient.set(`participants:${eventId}`, JSON.stringify(participants));
+      await redis.set(`participants:${eventId}`, JSON.stringify(participants));
       return updated;
     }
 
@@ -166,7 +172,7 @@ export async function saveParticipantRecord(
       updatedAt: now,
     };
     participants.push(newParticipant);
-    await redisClient.set(`participants:${eventId}`, JSON.stringify(participants));
+    await redis.set(`participants:${eventId}`, JSON.stringify(participants));
     return newParticipant;
   }
 
