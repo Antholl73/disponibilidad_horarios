@@ -5,9 +5,10 @@ import { Event } from '@/types';
 import {
   Check,
   CheckCheck,
-  RotateCcw,
   Sparkles,
-  Info
+  Info,
+  Hand,
+  Paintbrush
 } from 'lucide-react';
 
 interface AvailabilityGridProps {
@@ -30,6 +31,9 @@ export default function AvailabilityGrid({
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(() => new Set(initialSlots));
   const [hasChanges, setHasChanges] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Mobile mode: 'scroll' allows native swipe/scroll and tap to select; 'paint' allows continuous drag painting
+  const [mobileMode, setMobileMode] = useState<'scroll' | 'paint'>('scroll');
 
   // Sync initialSlots when switching participant or reloading
   useEffect(() => {
@@ -86,9 +90,9 @@ export default function AvailabilityGrid({
     return () => window.removeEventListener('mouseup', stopDrag);
   }, [stopDrag]);
 
-  // Mobile Touch Drag support
+  // Mobile Touch Drag support (active when in 'paint' mode)
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDraggingRef.current || !dragModeRef.current) return;
+    if (mobileMode !== 'paint' || !isDraggingRef.current || !dragModeRef.current) return;
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     const slotKey = element?.getAttribute('data-slot');
@@ -149,107 +153,139 @@ export default function AvailabilityGrid({
   };
 
   return (
-    <div className="select-none">
+    <div className="select-none pb-20 sm:pb-0">
       {/* Top action bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-slate-50 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80">
         <div className="flex items-center gap-2 text-xs text-slate-600">
           <Info className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-          <span>
+          <span className="hidden sm:inline">
             Haz <strong>clic y arrastra</strong> sobre los bloques para marcar o desmarcar tus horas disponibles.
+          </span>
+          <span className="sm:hidden">
+            Toca o arrastra para marcar tus horas disponibles.
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSelectAll}
-            className="px-2.5 py-1 text-xs font-medium text-slate-700 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-2xs"
-          >
-            Marcar todo
-          </button>
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="px-2.5 py-1 text-xs font-medium text-slate-700 hover:text-red-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-2xs"
-          >
-            Limpiar todo
-          </button>
-        </div>
-      </div>
-
-      {/* Grid Container */}
-      <div
-        className="overflow-x-auto pb-4 cursor-pointer"
-        onTouchMove={handleTouchMove}
-        onTouchEnd={stopDrag}
-      >
-        <div className="inline-block min-w-full align-middle">
-          <div className="border border-slate-300 rounded-xl overflow-hidden bg-white shadow-xs">
-            {/* Day Header Row */}
-            <div
-              className="grid bg-slate-100 border-b border-slate-300 text-center text-xs font-semibold text-slate-700"
-              style={{ gridTemplateColumns: `75px repeat(${event.dates.length}, minmax(105px, 1fr))` }}
+        <div className="flex items-center justify-between sm:justify-end gap-2">
+          {/* Mobile Mode Switcher */}
+          <div className="flex sm:hidden items-center bg-slate-200/70 p-1 rounded-xl text-[11px] font-semibold">
+            <button
+              type="button"
+              onClick={() => setMobileMode('scroll')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition ${
+                mobileMode === 'scroll'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600'
+              }`}
             >
-              <div className="p-2.5 border-r border-slate-300 bg-slate-200/60 flex items-center justify-center text-slate-500 font-mono text-[11px]">
-                Hora
-              </div>
-              {event.dates.map((date) => (
-                <div
-                  key={date}
-                  onClick={() => handleToggleColumn(date)}
-                  title="Clic para seleccionar/deseleccionar todo este día"
-                  className="p-2.5 border-r last:border-r-0 border-slate-300 hover:bg-indigo-50/80 transition cursor-pointer flex flex-col items-center justify-center"
-                >
-                  <span className="truncate max-w-[120px]">{date}</span>
-                  <span className="text-[10px] text-indigo-600 font-normal hover:underline">Alternar día</span>
-                </div>
-              ))}
-            </div>
+              <Hand className="w-3.5 h-3.5" /> Tocar
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileMode('paint')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition ${
+                mobileMode === 'paint'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600'
+              }`}
+            >
+              <Paintbrush className="w-3.5 h-3.5" /> Pintar
+            </button>
+          </div>
 
-            {/* Time Slot Rows */}
-            <div className="divide-y divide-slate-200 text-xs">
-              {timeSlots.map((time) => (
-                <div
-                  key={time}
-                  className="grid text-center"
-                  style={{ gridTemplateColumns: `75px repeat(${event.dates.length}, minmax(105px, 1fr))` }}
-                >
-                  {/* Time label */}
-                  <div className="p-2 font-mono text-[11px] text-slate-500 bg-slate-50 border-r border-slate-300 flex items-center justify-center">
-                    {time}
-                  </div>
-
-                  {/* Day cells */}
-                  {event.dates.map((date) => {
-                    const slotKey = `${date}_${time}`;
-                    const isSelected = selectedSlots.has(slotKey);
-
-                    return (
-                      <div
-                        key={slotKey}
-                        data-slot={slotKey}
-                        onMouseDown={() => startDrag(slotKey)}
-                        onMouseEnter={() => handleMouseEnter(slotKey)}
-                        onTouchStart={() => startDrag(slotKey)}
-                        className={`h-9 border-r last:border-r-0 border-slate-200 transition-colors flex items-center justify-center text-[10px] font-medium ${
-                          isSelected
-                            ? 'bg-emerald-500 text-white font-semibold'
-                            : 'bg-white hover:bg-indigo-50/40 text-transparent'
-                        }`}
-                      >
-                        {isSelected ? '✓ Libre' : ''}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="px-2.5 py-1 text-xs font-medium text-slate-700 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-2xs"
+            >
+              Marcar todo
+            </button>
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="px-2.5 py-1 text-xs font-medium text-slate-700 hover:text-red-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-2xs"
+            >
+              Limpiar
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Save Floating Bar */}
-      <div className="mt-4 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Grid Container with Sticky Column & Row */}
+      <div
+        className={`overflow-x-auto pb-4 cursor-pointer rounded-2xl border border-slate-300 shadow-xs bg-white ${
+          mobileMode === 'paint' ? 'touch-none' : 'touch-pan-x touch-pan-y'
+        }`}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={stopDrag}
+      >
+        <div className="inline-block min-w-full align-middle">
+          {/* Day Header Row */}
+          <div
+            className="grid bg-slate-100 border-b border-slate-300 text-center text-xs font-semibold text-slate-700 sticky top-0 z-20"
+            style={{ gridTemplateColumns: `70px repeat(${event.dates.length}, minmax(100px, 1fr))` }}
+          >
+            {/* Sticky Top-Left Corner */}
+            <div className="p-2.5 border-r border-slate-300 bg-slate-200/90 sticky left-0 z-30 flex items-center justify-center text-slate-600 font-mono text-[11px] shadow-xs">
+              Hora
+            </div>
+            {event.dates.map((date) => (
+              <div
+                key={date}
+                onClick={() => handleToggleColumn(date)}
+                title="Toca para seleccionar/deseleccionar todo este día"
+                className="p-2.5 border-r last:border-r-0 border-slate-300 hover:bg-indigo-50/80 active:bg-indigo-100 transition cursor-pointer flex flex-col items-center justify-center"
+              >
+                <span className="truncate max-w-[120px] font-bold">{date}</span>
+                <span className="text-[10px] text-indigo-600 font-normal hover:underline">Alternar</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Time Slot Rows */}
+          <div className="divide-y divide-slate-200 text-xs">
+            {timeSlots.map((time) => (
+              <div
+                key={time}
+                className="grid text-center"
+                style={{ gridTemplateColumns: `70px repeat(${event.dates.length}, minmax(100px, 1fr))` }}
+              >
+                {/* Sticky Left Column: Time label */}
+                <div className="p-2 font-mono text-[11px] text-slate-600 bg-slate-100/95 sticky left-0 z-10 border-r border-slate-300 flex items-center justify-center shadow-xs">
+                  {time}
+                </div>
+
+                {/* Day cells */}
+                {event.dates.map((date) => {
+                  const slotKey = `${date}_${time}`;
+                  const isSelected = selectedSlots.has(slotKey);
+
+                  return (
+                    <div
+                      key={slotKey}
+                      data-slot={slotKey}
+                      onMouseDown={() => startDrag(slotKey)}
+                      onMouseEnter={() => handleMouseEnter(slotKey)}
+                      onTouchStart={() => startDrag(slotKey)}
+                      className={`h-10 sm:h-9 border-r last:border-r-0 border-slate-200 transition-colors flex items-center justify-center text-[11px] font-medium ${
+                        isSelected
+                          ? 'bg-emerald-500 text-white font-semibold'
+                          : 'bg-white hover:bg-indigo-50/40 active:bg-indigo-100/60 text-transparent'
+                      }`}
+                    >
+                      {isSelected ? '✓ Libre' : ''}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Save Bar */}
+      <div className="hidden sm:flex mt-4 pt-4 border-t border-slate-200 items-center justify-between gap-4">
         <div className="flex items-center gap-3 text-xs text-slate-600">
           <div className="flex items-center gap-1.5">
             <span className="w-3.5 h-3.5 rounded bg-emerald-500 inline-block" />
@@ -271,7 +307,7 @@ export default function AvailabilityGrid({
           type="button"
           onClick={handleSaveClick}
           disabled={isSaving || !participantName.trim()}
-          className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white font-semibold text-sm transition shadow-sm flex items-center justify-center gap-2"
+          className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white font-semibold text-sm transition shadow-sm flex items-center justify-center gap-2"
         >
           {isSaving ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -282,6 +318,37 @@ export default function AvailabilityGrid({
           ) : (
             <>
               <Sparkles className="w-4 h-4" /> Guardar mi disponibilidad
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Mobile Floating Sticky Bottom Action Bar */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg z-40 flex items-center justify-between gap-3 safe-area-bottom">
+        <div className="flex flex-col text-left">
+          <span className="text-xs font-bold text-slate-900">
+            {selectedSlots.size} {selectedSlots.size === 1 ? 'bloque libre' : 'bloques libres'}
+          </span>
+          <span className="text-[10px] text-slate-500">
+            {hasChanges ? 'Cambios pendientes' : savedSuccess ? '✓ Guardado' : 'Listo para enviar'}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveClick}
+          disabled={isSaving || !participantName.trim()}
+          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+        >
+          {isSaving ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : savedSuccess ? (
+            <>
+              <CheckCheck className="w-3.5 h-3.5" /> Guardado
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5" /> Guardar
             </>
           )}
         </button>
