@@ -8,14 +8,15 @@ export async function GET(
   try {
     const params = await props.params;
     const { id } = params;
+    const url = new URL(request.url);
 
     let data = await getEventWithHeatmap(id);
 
     // Self-healing from searchParams if missing on this lambda
     if (!data) {
-      const url = new URL(request.url);
       const t = url.searchParams.get('t');
       const d = url.searchParams.get('d');
+      const adm = url.searchParams.get('adm');
       if (t && d) {
         try {
           await createEvent({
@@ -27,6 +28,7 @@ export async function GET(
             startHour: Number(url.searchParams.get('s')) || 9,
             endHour: Number(url.searchParams.get('e')) || 18,
             slotDuration: Number(url.searchParams.get('dur')) || 30,
+            adminKey: adm || undefined,
           });
           data = await getEventWithHeatmap(id);
         } catch (err) {
@@ -39,7 +41,19 @@ export async function GET(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    // Verificar si el solicitante es Administrador
+    const incomingKey = request.headers.get('x-admin-key') || url.searchParams.get('adm');
+    const isAdmin = Boolean(data.event.adminKey && incomingKey && incomingKey === data.event.adminKey);
+
+    // No filtrar la clave admin al público por seguridad
+    const safeEvent = { ...data.event };
+    delete safeEvent.adminKey;
+
+    return NextResponse.json({
+      ...data,
+      event: safeEvent,
+      isAdmin,
+    });
   } catch (error) {
     console.error('Error al obtener evento:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

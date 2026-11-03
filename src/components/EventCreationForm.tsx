@@ -34,6 +34,7 @@ export default function EventCreationForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+  const [createdAdminKey, setCreatedAdminKey] = useState<string>('');
   const [eventQueryStr, setEventQueryStr] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
@@ -158,6 +159,12 @@ export default function EventCreationForm() {
       }).toString();
 
       setCreatedEventId(data.id);
+      if (data.adminKey) {
+        setCreatedAdminKey(data.adminKey);
+        try {
+          localStorage.setItem(`disponi_adm_${data.id}`, data.adminKey);
+        } catch {}
+      }
       setEventQueryStr(query);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al conectar con el servidor';
@@ -226,8 +233,11 @@ export default function EventCreationForm() {
             </a>
 
             <button
-              onClick={() => router.push(`/event/${createdEventId}${eventQueryStr ? `?${eventQueryStr}` : ''}`)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors"
+              onClick={() => {
+                const admParam = createdAdminKey ? `&adm=${encodeURIComponent(createdAdminKey)}` : '';
+                router.push(`/event/${createdEventId}${eventQueryStr ? `?${eventQueryStr}${admParam}` : admParam ? `?${admParam.slice(1)}` : ''}`);
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
             >
               Ir a la sala del evento <ArrowRight className="w-3.5 h-3.5" />
             </button>

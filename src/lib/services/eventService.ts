@@ -3,6 +3,7 @@ import {
   getEventRecord,
   getParticipantsRecord,
   saveParticipantRecord,
+  deleteParticipantRecord,
 } from '@/lib/storage';
 import { Event, EventType, EventWithHeatmap, Participant, SlotAvailability } from '@/types';
 import crypto from 'node:crypto';
@@ -16,6 +17,7 @@ export interface CreateEventInput {
   startHour: number;
   endHour: number;
   slotDuration?: number; // 15, 30, 45, 60
+  adminKey?: string;
 }
 
 export function generateTimeSlots(startHour: number, endHour: number, slotDuration: number = 30): string[] {
@@ -37,6 +39,7 @@ export async function createEvent(input: CreateEventInput): Promise<Event> {
   const id = input.id || crypto.randomUUID().replace(/-/g, '').slice(0, 10);
   const now = new Date().toISOString();
   const slotDuration = input.slotDuration || 30;
+  const adminKey = input.adminKey || crypto.randomUUID().replace(/-/g, '');
 
   const event: Event = {
     id,
@@ -48,6 +51,7 @@ export async function createEvent(input: CreateEventInput): Promise<Event> {
     endHour: input.endHour,
     slotDuration,
     createdAt: now,
+    adminKey,
   };
 
   await saveEventRecord(event);
@@ -124,4 +128,42 @@ export async function saveParticipantAvailability(
   participantId?: string
 ): Promise<Participant> {
   return await saveParticipantRecord(eventId, name, slots, participantId);
+}
+
+export async function deleteParticipant(
+  eventId: string,
+  participantId: string,
+  auth: { adminKey?: string; participantName?: string }
+): Promise<EventWithHeatmap> {
+  const event = await getEvent(eventId);
+  if (!event) {
+    throw new Error('Evento no encontrado');
+  }
+
+  const participants = await getParticipantsRecord(eventId);
+  const target = participants.find((p) => p.id === participantId);
+  if (!target) {
+    throw new Error('El participante no fue encontrado en este evento');
+  }
+
+  // Comprobar permisos:
+  // 1. Admin: Si se envía adminKey válida que coincide con la clave del evento
+  // 2. Invitado: Solo puede eliminarse a sí mismo (coincide su nombre o ID)
+  const isAdmin = Boolean(auth.adminKey && event.adminKey && auth.adminKey === event.adminKey);
+  const isSelf = Boolean(
+    auth.participantName &&
+    auth.participantName.trim().toLowerCase() === target.name.trim().toLowerCase()
+  );
+
+  if (!isAdmin && !isSelf) {
+    throw new Error('No tienes permiso para eliminar a este participante. Solo el administrador o el propio usuario pueden hacerlo.');
+  }
+
+  await deleteParticipantRecord(eventId, participantId);
+
+  const updatedData = await getEventWithHeatmap(eventId);
+  if (!updatedData) {
+    throw new Error('Error al recargar el evento');
+  }
+  return updatedData;
 }

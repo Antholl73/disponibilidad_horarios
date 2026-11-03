@@ -39,8 +39,8 @@ export async function saveEventRecord(event: Event): Promise<void> {
   // SQLite fallback
   const db = getDatabase();
   const stmt = db.prepare(`
-    INSERT OR REPLACE INTO events (id, title, description, type, dates, start_hour, end_hour, slot_duration, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO events (id, title, description, type, dates, start_hour, end_hour, slot_duration, created_at, admin_key)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -52,7 +52,8 @@ export async function saveEventRecord(event: Event): Promise<void> {
     event.startHour,
     event.endHour,
     event.slotDuration,
-    event.createdAt
+    event.createdAt,
+    event.adminKey || null
   );
 }
 
@@ -77,6 +78,7 @@ export async function getEventRecord(id: string): Promise<Event | null> {
     end_hour: number;
     slot_duration: number;
     created_at: string;
+    admin_key?: string | null;
   } | undefined;
 
   if (!row) return null;
@@ -91,6 +93,7 @@ export async function getEventRecord(id: string): Promise<Event | null> {
     endHour: row.end_hour,
     slotDuration: row.slot_duration,
     createdAt: row.created_at,
+    adminKey: row.admin_key || undefined,
   };
 }
 
@@ -223,4 +226,24 @@ export async function saveParticipantRecord(
     createdAt: now,
     updatedAt: now,
   };
+}
+
+export async function deleteParticipantRecord(eventId: string, participantId: string): Promise<boolean> {
+  const redis = getRedisClient();
+  if (redis) {
+    const participants = await getParticipantsRecord(eventId);
+    const initialLen = participants.length;
+    const filtered = participants.filter((p) => p.id !== participantId);
+    if (filtered.length !== initialLen) {
+      await redis.set(`participants:${eventId}`, JSON.stringify(filtered));
+      return true;
+    }
+    return false;
+  }
+
+  // SQLite fallback
+  const db = getDatabase();
+  const stmt = db.prepare('DELETE FROM participants WHERE id = ? AND event_id = ?');
+  const result = stmt.run(participantId, eventId) as { changes?: number };
+  return Boolean(result && typeof result.changes === 'number' ? result.changes > 0 : true);
 }

@@ -14,6 +14,7 @@ interface EventPageProps {
     s?: string; // startHour
     e?: string; // endHour
     dur?: string; // slotDuration
+    adm?: string; // adminKey
   }>;
 }
 
@@ -38,6 +39,7 @@ export default async function EventPage(props: EventPageProps) {
         startHour: Number(searchParams.s) || 9,
         endHour: Number(searchParams.e) || 18,
         slotDuration: Number(searchParams.dur) || 30,
+        adminKey: searchParams.adm,
       });
       data = await getEventWithHeatmap(id);
     } catch (e) {
@@ -68,6 +70,19 @@ export default async function EventPage(props: EventPageProps) {
     );
   }
 
+  // Check if incoming query parameter matches admin key
+  const isIncomingAdmin = Boolean(data.event.adminKey && searchParams.adm && searchParams.adm === data.event.adminKey);
+
+  // Strip adminKey from client props for security
+  const safeEvent = { ...data.event };
+  delete safeEvent.adminKey;
+
+  const clientData = {
+    ...data,
+    event: safeEvent,
+    isAdmin: isIncomingAdmin,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-150">
       {/* Top Navigation */}
@@ -91,7 +106,7 @@ export default async function EventPage(props: EventPageProps) {
 
       {/* Main Room Component */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        <EventRoomClient initialData={data} />
+        <EventRoomClient initialData={clientData} initialAdminKey={searchParams.adm} />
       </main>
     </div>
   );

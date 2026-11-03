@@ -37,7 +37,8 @@ export function getDatabase(): DatabaseSync {
         start_hour INTEGER NOT NULL,
         end_hour INTEGER NOT NULL,
         slot_duration INTEGER NOT NULL DEFAULT 30,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        admin_key TEXT
       );
 
       CREATE TABLE IF NOT EXISTS participants (
@@ -52,6 +53,13 @@ export function getDatabase(): DatabaseSync {
 
       CREATE INDEX IF NOT EXISTS idx_participants_event ON participants(event_id);
     `);
+
+    // Migración no destructiva si la columna admin_key no existe aún
+    try {
+      db.exec('ALTER TABLE events ADD COLUMN admin_key TEXT;');
+    } catch {
+      // Ignorar si la columna ya existe
+    }
 
     globalForDb.dbInstance = db;
   }

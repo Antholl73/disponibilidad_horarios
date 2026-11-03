@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getEvent, createEvent, saveParticipantAvailability, getEventWithHeatmap } from '@/lib/services/eventService';
+import {
+  getEvent,
+  createEvent,
+  saveParticipantAvailability,
+  deleteParticipant,
+  getEventWithHeatmap,
+} from '@/lib/services/eventService';
 
 export async function POST(
   request: Request,
@@ -26,6 +32,7 @@ export async function POST(
           startHour: Number(eventData.startHour) || 9,
           endHour: Number(eventData.endHour) || 18,
           slotDuration: Number(eventData.slotDuration) || 30,
+          adminKey: eventData.adminKey,
         });
       } catch (err) {
         console.warn('Error al auto-reparar evento en API participants:', err);
@@ -54,5 +61,37 @@ export async function POST(
   } catch (error) {
     console.error('Error al guardar participante:', error);
     return NextResponse.json({ error: 'Error al registrar disponibilidad' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await props.params;
+    const { id } = params;
+
+    const body = await request.json();
+    const { participantId, adminKey, participantName } = body;
+
+    if (!participantId) {
+      return NextResponse.json({ error: 'ID de participante no proporcionado' }, { status: 400 });
+    }
+
+    const updatedData = await deleteParticipant(id, participantId, {
+      adminKey,
+      participantName,
+    });
+
+    return NextResponse.json({
+      success: true,
+      updatedData,
+    });
+  } catch (error: unknown) {
+    console.error('Error al eliminar participante:', error);
+    const message = error instanceof Error ? error.message : 'Error al eliminar participante';
+    const status = message.includes('permiso') ? 403 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
