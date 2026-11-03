@@ -35,15 +35,33 @@ export default function AvailabilityGrid({
   // Mobile mode: 'scroll' allows native swipe/scroll and tap to select; 'paint' allows continuous drag painting
   const [mobileMode, setMobileMode] = useState<'scroll' | 'paint'>('scroll');
 
+  // Track touch positions to distinguish tap from swipe/scroll in 'scroll' mode
+  const touchStartRef = useRef<{ x: number; y: number; time: number; slotKey: string } | null>(null);
+  const isTouchRef = useRef(false);
+
   // Sync initialSlots when switching participant or reloading
   useEffect(() => {
     setSelectedSlots(new Set(initialSlots));
     setHasChanges(false);
   }, [initialSlots]);
 
-  // Drag interaction state
+  // Drag interaction state for desktop mouse and mobile paint mode
   const isDraggingRef = useRef(false);
   const dragModeRef = useRef<'add' | 'remove' | null>(null);
+
+  const toggleSingleSlot = useCallback((slotKey: string) => {
+    setSelectedSlots((prev) => {
+      const next = new Set(prev);
+      if (next.has(slotKey)) {
+        next.delete(slotKey);
+      } else {
+        next.add(slotKey);
+      }
+      return next;
+    });
+    setHasChanges(true);
+    setSavedSuccess(false);
+  }, []);
 
   const startDrag = (slotKey: string) => {
     isDraggingRef.current = true;
@@ -90,7 +108,56 @@ export default function AvailabilityGrid({
     return () => window.removeEventListener('mouseup', stopDrag);
   }, [stopDrag]);
 
-  // Mobile Touch Drag support (active when in 'paint' mode)
+  // Desktop Mouse Handlers
+  const handleMouseDown = (slotKey: string) => {
+    // If triggered by a touch event, ignore synthetic mouse event
+    if (isTouchRef.current) return;
+    startDrag(slotKey);
+  };
+
+  // Mobile Touch Handlers
+  const handleCellTouchStart = (slotKey: string, e: React.TouchEvent) => {
+    isTouchRef.current = true;
+
+    if (mobileMode === 'paint') {
+      // In Paint mode: start dragging immediately
+      startDrag(slotKey);
+    } else {
+      // In Scroll/Tap mode: record touch start to check if it's a tap or scroll
+      const touch = e.touches[0];
+      touchStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        time: Date.now(),
+        slotKey,
+      };
+    }
+  };
+
+  const handleCellTouchEnd = (e: React.TouchEvent) => {
+    if (mobileMode === 'paint') {
+      stopDrag();
+    } else if (touchStartRef.current) {
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      const dist = Math.hypot(dx, dy);
+      const duration = Date.now() - touchStartRef.current.time;
+
+      // Only toggle if the finger stayed within 10px and touch was brief (genuine tap, NOT a scroll!)
+      if (dist < 10 && duration < 500) {
+        toggleSingleSlot(touchStartRef.current.slotKey);
+      }
+      touchStartRef.current = null;
+    }
+
+    // Reset touch flag shortly after to allow mouse on hybrid devices
+    setTimeout(() => {
+      isTouchRef.current = false;
+    }, 400);
+  };
+
+  // Mobile Continuous Paint Drag
   const handleTouchMove = (e: React.TouchEvent) => {
     if (mobileMode !== 'paint' || !isDraggingRef.current || !dragModeRef.current) return;
     const touch = e.touches[0];
@@ -161,8 +228,10 @@ export default function AvailabilityGrid({
           <span className="hidden sm:inline">
             Haz <strong>clic y arrastra</strong> sobre los bloques para marcar o desmarcar tus horas disponibles.
           </span>
-          <span className="sm:hidden">
-            Toca o arrastra para marcar tus horas disponibles.
+          <span className="sm:hidden text-[11px]">
+            {mobileMode === 'scroll'
+              ? 'Modo Tocar activo: desliza libremente y toca cualquier celda para marcarla.'
+              : 'Modo Pintar activo: arrastra el dedo para pintar múltiples celdas.'}
           </span>
         </div>
 
@@ -218,7 +287,7 @@ export default function AvailabilityGrid({
           mobileMode === 'paint' ? 'touch-none' : 'touch-pan-x touch-pan-y'
         }`}
         onTouchMove={handleTouchMove}
-        onTouchEnd={stopDrag}
+        onTouchEnd={handleCellTouchEnd}
       >
         <div className="inline-block min-w-full align-middle">
           {/* Day Header Row */}
@@ -234,7 +303,7 @@ export default function AvailabilityGrid({
               <div
                 key={date}
                 onClick={() => handleToggleColumn(date)}
-                title="Toca para seleccionar/deseleccionar todo este día"
+                title="Toca para alternar todo este día"
                 className="p-2.5 border-r last:border-r-0 border-slate-300 hover:bg-indigo-50/80 active:bg-indigo-100 transition cursor-pointer flex flex-col items-center justify-center"
               >
                 <span className="truncate max-w-[120px] font-bold">{date}</span>
@@ -265,9 +334,10 @@ export default function AvailabilityGrid({
                     <div
                       key={slotKey}
                       data-slot={slotKey}
-                      onMouseDown={() => startDrag(slotKey)}
+                      onMouseDown={() => handleMouseDown(slotKey)}
                       onMouseEnter={() => handleMouseEnter(slotKey)}
-                      onTouchStart={() => startDrag(slotKey)}
+                      onTouchStart={(e) => handleCellTouchStart(slotKey, e)}
+                      onTouchEnd={handleCellTouchEnd}
                       className={`h-10 sm:h-9 border-r last:border-r-0 border-slate-200 transition-colors flex items-center justify-center text-[11px] font-medium ${
                         isSelected
                           ? 'bg-emerald-500 text-white font-semibold'
