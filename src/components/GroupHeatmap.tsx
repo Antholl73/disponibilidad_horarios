@@ -11,6 +11,7 @@ import {
   Clock,
   UserCheck,
   UserX,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface GroupHeatmapProps {
@@ -20,6 +21,8 @@ interface GroupHeatmapProps {
   heatmap: Record<string, SlotAvailability>;
   highlightedParticipant?: Participant | null;
   onSelectParticipant?: (p: Participant | null) => void;
+  onExportExcel?: () => void;
+  isExporting?: boolean;
 }
 
 export default function GroupHeatmap({
@@ -29,6 +32,8 @@ export default function GroupHeatmap({
   heatmap,
   highlightedParticipant,
   onSelectParticipant,
+  onExportExcel,
+  isExporting = false,
 }: GroupHeatmapProps) {
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
 
@@ -122,40 +127,58 @@ export default function GroupHeatmap({
 
   return (
     <div className="space-y-6 pb-20 sm:pb-0">
-      {/* Participant Filter Pills */}
+      {/* Participant Filter Pills & Excel Export */}
       {participants.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium mr-1 flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Filtrar:
-          </span>
-          <button
-            type="button"
-            onClick={() => onSelectParticipant && onSelectParticipant(null)}
-            className={`px-2.5 py-1 rounded-lg transition font-medium ${
-              !highlightedParticipant
-                ? 'bg-slate-900 dark:bg-indigo-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            Todos ({participants.length})
-          </button>
-          {participants.map((p) => {
-            const isSelected = highlightedParticipant?.id === p.id;
-            return (
-              <button
-                type="button"
-                key={p.id}
-                onClick={() => onSelectParticipant && onSelectParticipant(isSelected ? null : p)}
-                className={`px-2.5 py-1 rounded-lg transition font-medium border ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/50'
-                }`}
-              >
-                {p.name} ({p.slots.length})
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-slate-500 dark:text-slate-400 font-medium mr-1 flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Filtrar:
+            </span>
+            <button
+              type="button"
+              onClick={() => onSelectParticipant && onSelectParticipant(null)}
+              className={`px-2.5 py-1 rounded-lg transition font-medium ${
+                !highlightedParticipant
+                  ? 'bg-slate-900 dark:bg-indigo-600 text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              Todos ({participants.length})
+            </button>
+            {participants.map((p) => {
+              const isSelected = highlightedParticipant?.id === p.id;
+              return (
+                <button
+                  type="button"
+                  key={p.id}
+                  onClick={() => onSelectParticipant && onSelectParticipant(isSelected ? null : p)}
+                  className={`px-2.5 py-1 rounded-lg transition font-medium border ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/50'
+                  }`}
+                >
+                  {p.name} ({p.slots.length})
+                </button>
+              );
+            })}
+          </div>
+
+          {onExportExcel && (
+            <button
+              type="button"
+              onClick={onExportExcel}
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium transition shadow-2xs cursor-pointer ml-auto"
+            >
+              {isExporting ? (
+                <div className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              )}
+              <span>Exportar Excel</span>
+            </button>
+          )}
         </div>
       )}
 
