@@ -8,10 +8,17 @@ const globalForDb = globalThis as unknown as {
 
 export function getDatabase(): DatabaseSync {
   if (!globalForDb.dbInstance) {
-    const dataDir = path.join(process.cwd(), 'data');
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production' && !fs.existsSync(path.join(process.cwd(), 'data')));
+    const dataDir = isServerless ? '/tmp' : path.join(process.cwd(), 'data');
+
     if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+      try {
+        fs.mkdirSync(dataDir, { recursive: true });
+      } catch {
+        // Fallback to /tmp if current directory is not writable
+      }
     }
+
     const dbPath = path.join(dataDir, 'disponibilidad.db');
     const db = new DatabaseSync(dbPath);
 
