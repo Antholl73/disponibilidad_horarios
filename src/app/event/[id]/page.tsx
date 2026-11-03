@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { getEventWithHeatmap, createEvent } from '@/lib/services/eventService';
 import EventRoomClient from '@/components/EventRoomClient';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { ArrowLeft, AlertCircle, PlusCircle } from 'lucide-react';
+import { ClientEventRecovery } from '@/components/ClientEventRecovery';
+import { ArrowLeft } from 'lucide-react';
 
 interface EventPageProps {
   params: Promise<{ id: string }>;
@@ -18,6 +19,15 @@ interface EventPageProps {
   }>;
 }
 
+function safeDecode(val: string | undefined): string {
+  if (!val) return '';
+  try {
+    return val.includes('%') ? decodeURIComponent(val) : val;
+  } catch {
+    return val;
+  }
+}
+
 export default async function EventPage(props: EventPageProps) {
   const params = await props.params;
   const searchParams = await props.searchParams;
@@ -29,11 +39,15 @@ export default async function EventPage(props: EventPageProps) {
   // reconstruct and persist it on-demand from URL parameters!
   if (!data && searchParams.t && searchParams.d) {
     try {
-      const dates = decodeURIComponent(searchParams.d).split(',').filter(Boolean);
+      const decodedD = safeDecode(searchParams.d);
+      const dates = decodedD.split(',').map((s) => s.trim()).filter(Boolean);
+      const title = safeDecode(searchParams.t);
+      const desc = searchParams.desc ? safeDecode(searchParams.desc) : undefined;
+
       await createEvent({
         id,
-        title: decodeURIComponent(searchParams.t),
-        description: searchParams.desc ? decodeURIComponent(searchParams.desc) : undefined,
+        title: title || 'Reunión Grupal',
+        description: desc,
         type: searchParams.m === 'days' ? 'days' : 'dates',
         dates,
         startHour: Number(searchParams.s) || 9,
@@ -47,25 +61,11 @@ export default async function EventPage(props: EventPageProps) {
     }
   }
 
-  // Friendly Fallback screen instead of raw 404
+  // Fallback screen with client-side localStorage auto-recovery
   if (!data) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 max-w-md w-full text-center shadow-sm">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Evento no encontrado</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            La sala de reunión que buscas no existe o ha expirado. Puedes crear una nueva reunión en cuestión de segundos.
-          </p>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition"
-          >
-            <PlusCircle className="w-4 h-4" /> Crear nueva reunión
-          </Link>
-        </div>
+        <ClientEventRecovery eventId={id} />
       </div>
     );
   }
@@ -90,7 +90,7 @@ export default async function EventPage(props: EventPageProps) {
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Volver al inicio
           </Link>

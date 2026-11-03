@@ -73,7 +73,27 @@ export async function DELETE(
     const { id } = params;
 
     const body = await request.json();
-    const { participantId, adminKey, participantName } = body;
+    const { participantId, adminKey, participantName, event: eventData } = body;
+
+    // Self-healing if lambda does not have the event in /tmp
+    let event = await getEvent(id);
+    if (!event && eventData) {
+      try {
+        event = await createEvent({
+          id,
+          title: eventData.title || 'Reunión Grupal',
+          description: eventData.description,
+          type: eventData.type || 'dates',
+          dates: Array.isArray(eventData.dates) ? eventData.dates : [],
+          startHour: Number(eventData.startHour) || 9,
+          endHour: Number(eventData.endHour) || 18,
+          slotDuration: Number(eventData.slotDuration) || 30,
+          adminKey: eventData.adminKey,
+        });
+      } catch (err) {
+        console.warn('Error al auto-reparar evento en DELETE participants:', err);
+      }
+    }
 
     if (!participantId) {
       return NextResponse.json({ error: 'ID de participante no proporcionado' }, { status: 400 });

@@ -101,7 +101,41 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
     return () => clearInterval(timer);
   }, [refreshEventData]);
 
-  const eventUrl = typeof window !== 'undefined' ? `${window.location.origin}/event/${event.id}` : '';
+  // Store event blueprint in localStorage for instant client-side recovery
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          `disponi_blueprint_${event.id}`,
+          JSON.stringify({
+            t: event.title,
+            desc: event.description,
+            m: event.type,
+            d: event.dates,
+            s: event.startHour,
+            e: event.endHour,
+            dur: event.slotDuration,
+          })
+        );
+      } catch {}
+    }
+  }, [event]);
+
+  const shareQuery = React.useMemo(() => {
+    return new URLSearchParams({
+      t: event.title,
+      ...(event.description ? { desc: event.description } : {}),
+      m: event.type,
+      d: event.dates.join(','),
+      s: String(event.startHour),
+      e: String(event.endHour),
+      dur: String(event.slotDuration),
+    }).toString();
+  }, [event]);
+
+  const eventUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/event/${event.id}?${shareQuery}`
+    : '';
 
   const copyToClipboard = () => {
     if (!eventUrl) return;
@@ -275,6 +309,16 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
           participantId: participantToDelete.id,
           adminKey: currentAdm || undefined,
           participantName: participantName.trim() || undefined,
+          event: {
+            title: event.title,
+            description: event.description,
+            type: event.type,
+            dates: event.dates,
+            startHour: event.startHour,
+            endHour: event.endHour,
+            slotDuration: event.slotDuration,
+            adminKey: currentAdm || undefined,
+          },
         }),
       });
 
