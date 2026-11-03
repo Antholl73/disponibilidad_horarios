@@ -25,6 +25,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Rango horario no válido.' }, { status: 400 });
     }
 
+    const validDurations = [15, 30, 45, 60];
+    const durationNum = Number(slotDuration);
+    const finalSlotDuration = validDurations.includes(durationNum) ? durationNum : 30;
+
     const event = createEvent({
       title: title.trim(),
       description: description?.trim(),
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
       dates,
       startHour: sHour,
       endHour: eHour,
-      slotDuration: Number(slotDuration) === 60 ? 60 : 30,
+      slotDuration: finalSlotDuration,
     });
 
     return NextResponse.json(event, { status: 201 });

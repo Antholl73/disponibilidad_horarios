@@ -444,8 +444,10 @@ export default function EventCreationForm() {
                 onChange={(e) => setSlotDuration(Number(e.target.value))}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
+                <option value={15}>15 minutos</option>
                 <option value={30}>30 minutos (Recomendado)</option>
-                <option value={60}>1 hora</option>
+                <option value={45}>45 minutos</option>
+                <option value={60}>1 hora (60 minutos)</option>
               </select>
             </div>
           </div>
