@@ -20,6 +20,7 @@ export interface Participant {
   slots: string[]; // list of slot keys: `${dateOrDay}_${time}`
   createdAt: string;
   updatedAt: string;
+  token?: string; // Token secreto de autorización del participante
 }
 
 export interface SlotAvailability {

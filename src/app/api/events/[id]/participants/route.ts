@@ -16,7 +16,7 @@ export async function POST(
     const { id } = params;
 
     const body = await request.json();
-    const { name, slots, participantId, event: eventData } = body;
+    const { name, slots, participantId, participantToken, adminKey, event: eventData } = body;
 
     // Self-healing: if the serverless container does not have this event in memory,
     // reconstruct and persist it using the event metadata provided in the request!
@@ -51,16 +51,21 @@ export async function POST(
       return NextResponse.json({ error: 'Formato de slots inválido' }, { status: 400 });
     }
 
-    const participant = await saveParticipantAvailability(id, name, slots, participantId);
+    const participant = await saveParticipantAvailability(id, name, slots, participantId, {
+      participantToken,
+      adminKey,
+    });
     const updatedData = await getEventWithHeatmap(id);
 
     return NextResponse.json({
       participant,
       updatedData,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error al guardar participante:', error);
-    return NextResponse.json({ error: 'Error al registrar disponibilidad' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Error al registrar disponibilidad';
+    const status = msg.includes('ya ha sido registrado') ? 400 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
 
@@ -73,7 +78,7 @@ export async function DELETE(
     const { id } = params;
 
     const body = await request.json();
-    const { participantId, adminKey, participantName, event: eventData } = body;
+    const { participantId, participantToken, adminKey, event: eventData } = body;
 
     // Self-healing if lambda does not have the event in /tmp
     let event = await getEvent(id);
@@ -101,7 +106,7 @@ export async function DELETE(
 
     const updatedData = await deleteParticipant(id, participantId, {
       adminKey,
-      participantName,
+      participantToken,
     });
 
     return NextResponse.json({

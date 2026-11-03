@@ -48,15 +48,22 @@ export function getDatabase(): DatabaseSync {
         slots TEXT NOT NULL DEFAULT '[]',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        token TEXT,
         FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE
       );
 
       CREATE INDEX IF NOT EXISTS idx_participants_event ON participants(event_id);
     `);
 
-    // Migración no destructiva si la columna admin_key no existe aún
+    // Migraciones no destructivas para bases de datos existentes
     try {
       db.exec('ALTER TABLE events ADD COLUMN admin_key TEXT;');
+    } catch {
+      // Ignorar si la columna ya existe
+    }
+
+    try {
+      db.exec('ALTER TABLE participants ADD COLUMN token TEXT;');
     } catch {
       // Ignorar si la columna ya existe
     }

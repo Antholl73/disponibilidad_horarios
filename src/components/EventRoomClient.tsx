@@ -21,7 +21,8 @@ import {
   Trash2,
   ShieldCheck,
   KeyRound,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 
 interface EventRoomClientProps {
@@ -38,6 +39,10 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
   const [localSlots, setLocalSlots] = useState<string[]>([]);
   const [highlightedParticipant, setHighlightedParticipant] = useState<Participant | null>(null);
 
+  // Authenticated Participant Token & ID
+  const [participantToken, setParticipantToken] = useState<string | null>(null);
+  const [myParticipantId, setMyParticipantId] = useState<string | null>(null);
+
   // Admin and Role State
   const [adminKey, setAdminKey] = useState<string | null>(initialAdminKey || null);
   const [isAdmin, setIsAdmin] = useState<boolean>(Boolean(initialData.isAdmin));
@@ -53,9 +58,17 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
   const [copied, setCopied] = useState(false);
   const [notification, setNotification] = useState<{ message: string; showSwitchTab?: boolean } | null>(null);
 
-  // Restore remembered participant name, slots, and admin key for this event
+  // Restore remembered participant identity, slots, and admin key for this event
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const savedToken = localStorage.getItem(`disponi_token_${event.id}`);
+      if (savedToken) {
+        setParticipantToken(savedToken);
+      }
+      const savedPid = localStorage.getItem(`disponi_pid_${event.id}`);
+      if (savedPid) {
+        setMyParticipantId(savedPid);
+      }
       const savedName = localStorage.getItem(`disponi_name_${event.id}`);
       if (savedName) {
         setParticipantName(savedName);
@@ -144,9 +157,34 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Find existing participant if the typed name matches
-  const currentParticipant = participants.find(
+  // My own participant record (verified by saved participant ID or token)
+  const myParticipant = participants.find((p) => {
+    if (myParticipantId && p.id === myParticipantId) return true;
+    if (participantToken) {
+      const savedName = typeof window !== 'undefined' ? localStorage.getItem(`disponi_name_${event.id}`) : null;
+      if (savedName && p.name.trim().toLowerCase() === savedName.trim().toLowerCase()) return true;
+    }
+    return false;
+  });
+
+  // Participant matching the typed name in the input field
+  const matchingParticipant = participants.find(
     (p) => p.name.trim().toLowerCase() === participantName.trim().toLowerCase()
+  );
+
+  // Is the participant matching the typed name actually ME?
+  const isOwnerOfMatchingParticipant = Boolean(
+    matchingParticipant && (
+      (myParticipantId && matchingParticipant.id === myParticipantId) ||
+      (myParticipant && matchingParticipant.id === myParticipant.id) ||
+      (participantToken && typeof window !== 'undefined' && localStorage.getItem(`disponi_name_${event.id}`)?.trim().toLowerCase() === matchingParticipant.name.trim().toLowerCase())
+    )
+  );
+
+  // Detect impersonation / name collision:
+  // Someone typed a name that is already in participants, but they DO NOT own that participant record!
+  const isImpersonatingOrCollision = Boolean(
+    matchingParticipant && !isOwnerOfMatchingParticipant && !isAdmin
   );
 
   const handleSaveAvailability = async (slots: string[]) => {
@@ -155,16 +193,26 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
       return;
     }
 
+    if (isImpersonatingOrCollision) {
+      alert(`El nombre "${participantName.trim()}" ya ha sido registrado por otro usuario en este evento. Por favor utiliza otro nombre o alias.`);
+      return;
+    }
+
     setIsSaving(true);
     try {
       const currentAdm = adminKey || (typeof window !== 'undefined' ? localStorage.getItem(`disponi_adm_${event.id}`) : undefined);
+      const currentToken = participantToken || (typeof window !== 'undefined' ? localStorage.getItem(`disponi_token_${event.id}`) : undefined);
+      const targetPid = myParticipantId || (isOwnerOfMatchingParticipant ? matchingParticipant?.id : undefined);
+
       const res = await fetch(`/api/events/${event.id}/participants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: participantName.trim(),
           slots,
-          participantId: currentParticipant?.id,
+          participantId: targetPid,
+          participantToken: currentToken || undefined,
+          adminKey: currentAdm || undefined,
           event: {
             title: event.title,
             description: event.description,
@@ -181,6 +229,21 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
       const json = await res.json();
       if (!res.ok) {
         throw new Error(json.error || 'Error al guardar disponibilidad');
+      }
+
+      if (json.participant) {
+        if (json.participant.token) {
+          setParticipantToken(json.participant.token);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`disponi_token_${event.id}`, json.participant.token);
+          }
+        }
+        if (json.participant.id) {
+          setMyParticipantId(json.participant.id);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`disponi_pid_${event.id}`, json.participant.id);
+          }
+        }
       }
 
       if (json.updatedData) {
@@ -302,11 +365,14 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
 
     try {
       const currentAdm = adminKey || (typeof window !== 'undefined' ? localStorage.getItem(`disponi_adm_${event.id}`) : null);
+      const currentToken = participantToken || (typeof window !== 'undefined' ? localStorage.getItem(`disponi_token_${event.id}`) : null);
+
       const res = await fetch(`/api/events/${event.id}/participants`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           participantId: participantToDelete.id,
+          participantToken: currentToken || undefined,
           adminKey: currentAdm || undefined,
           participantName: participantName.trim() || undefined,
           event: {
@@ -336,13 +402,21 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
         }));
       }
 
-      const isSelf = participantToDelete.name.trim().toLowerCase() === participantName.trim().toLowerCase();
+      const isSelf =
+        participantToDelete.id === myParticipantId ||
+        (myParticipant && participantToDelete.id === myParticipant.id) ||
+        (Boolean(currentToken) && participantToDelete.name.trim().toLowerCase() === participantName.trim().toLowerCase());
+
       if (isSelf) {
         setParticipantName('');
         setLocalSlots([]);
+        setParticipantToken(null);
+        setMyParticipantId(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem(`disponi_name_${event.id}`);
           localStorage.removeItem(`disponi_slots_${event.id}`);
+          localStorage.removeItem(`disponi_token_${event.id}`);
+          localStorage.removeItem(`disponi_pid_${event.id}`);
         }
         setNotification({
           message: 'Has retirado tus horarios y abandonado el evento.',
@@ -523,14 +597,21 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-sm text-slate-900 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500"
             />
 
-            {currentParticipant ? (
+            {isImpersonatingOrCollision ? (
+              <div className="mt-2.5 pt-2 border-t border-amber-200 dark:border-amber-900/60 flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <span>
+                  El nombre <strong>&quot;{matchingParticipant?.name}&quot;</strong> ya ha sido registrado por otro usuario. Por favor escribe otro nombre o alias.
+                </span>
+              </div>
+            ) : isOwnerOfMatchingParticipant && matchingParticipant ? (
               <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
                 <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                  <Check className="w-3.5 h-3.5" /> {currentParticipant.slots.length} bloques guardados.
+                  <Check className="w-3.5 h-3.5" /> {matchingParticipant.slots.length} bloques guardados.
                 </span>
                 <button
                   type="button"
-                  onClick={() => setParticipantToDelete(currentParticipant)}
+                  onClick={() => setParticipantToDelete(matchingParticipant)}
                   className="text-rose-600 dark:text-rose-400 hover:underline font-medium cursor-pointer"
                 >
                   Retirar mi horario
@@ -564,7 +645,11 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
             ) : (
               <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                 {participants.map((p) => {
-                  const isCurrent = p.name.trim().toLowerCase() === participantName.trim().toLowerCase();
+                  const isCurrent = Boolean(
+                    (myParticipantId && p.id === myParticipantId) ||
+                    (myParticipant && p.id === myParticipant.id) ||
+                    (participantToken && typeof window !== 'undefined' && localStorage.getItem(`disponi_name_${event.id}`)?.trim().toLowerCase() === p.name.trim().toLowerCase())
+                  );
                   const isHighlighted = highlightedParticipant?.id === p.id;
                   const canDelete = isAdmin || isCurrent;
 
@@ -668,20 +753,27 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
                     onChange={(e) => setParticipantName(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-sm text-slate-900 dark:text-white font-semibold"
                   />
-                  {currentParticipant && (
+                  {isImpersonatingOrCollision ? (
+                    <div className="mt-2 pt-1.5 border-t border-amber-200 dark:border-amber-900/60 flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                      <span>
+                        El nombre <strong>&quot;{matchingParticipant?.name}&quot;</strong> ya fue registrado por otro usuario. Por favor usa otro nombre.
+                      </span>
+                    </div>
+                  ) : isOwnerOfMatchingParticipant && matchingParticipant ? (
                     <div className="flex items-center justify-between text-[11px] mt-2 pt-1 border-t border-slate-200 dark:border-slate-700">
                       <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                        ✓ {currentParticipant.slots.length} bloques guardados.
+                        ✓ {matchingParticipant.slots.length} bloques guardados.
                       </span>
                       <button
                         type="button"
-                        onClick={() => setParticipantToDelete(currentParticipant)}
+                        onClick={() => setParticipantToDelete(matchingParticipant)}
                         className="text-rose-600 dark:text-rose-400 font-semibold hover:underline"
                       >
                         Retirar mi horario
                       </button>
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Notice if participants already answered */}
@@ -715,7 +807,7 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
                 <AvailabilityGrid
                   event={event}
                   timeSlots={timeSlots}
-                  initialSlots={currentParticipant ? currentParticipant.slots : localSlots}
+                  initialSlots={isOwnerOfMatchingParticipant && matchingParticipant ? matchingParticipant.slots : (myParticipant ? myParticipant.slots : localSlots)}
                   participantName={participantName}
                   onSave={handleSaveAvailability}
                   isSaving={isSaving}
@@ -775,12 +867,12 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  {participantToDelete.name.trim().toLowerCase() === participantName.trim().toLowerCase()
+                  {participantToDelete.id === myParticipantId || (myParticipant && participantToDelete.id === myParticipant.id)
                     ? '¿Retirar tu horario?'
                     : `¿Eliminar a ${participantToDelete.name}?`}
                 </h3>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {isAdmin && participantToDelete.name.trim().toLowerCase() !== participantName.trim().toLowerCase()
+                  {isAdmin && (participantToDelete.id !== myParticipantId && (!myParticipant || participantToDelete.id !== myParticipant.id))
                     ? 'Acción de Administrador'
                     : 'Acción de Participante'}
                 </span>
@@ -788,7 +880,7 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
             </div>
 
             <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed mb-5">
-              {participantToDelete.name.trim().toLowerCase() === participantName.trim().toLowerCase()
+              {participantToDelete.id === myParticipantId || (myParticipant && participantToDelete.id === myParticipant.id)
                 ? 'Se borrarán todos tus bloques marcados en este evento y serás retirado de la lista grupal.'
                 : `Se eliminarán los ${participantToDelete.slots.length} bloques marcados por ${participantToDelete.name}. El mapa de calor grupal se actualizará de inmediato.`}
             </p>

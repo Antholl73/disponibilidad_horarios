@@ -111,7 +111,7 @@ export async function getParticipantsRecord(eventId: string): Promise<Participan
 
   // SQLite fallback
   const db = getDatabase();
-  const stmt = db.prepare('SELECT * FROM participants WHERE event_id = ? ORDER BY created_at ASC');
+  const stmt = db.prepare('SELECT id, event_id, name, slots, created_at, updated_at, token FROM participants WHERE event_id = ? ORDER BY created_at ASC');
   const rows = stmt.all(eventId) as unknown as {
     id: string;
     event_id: string;
@@ -119,6 +119,7 @@ export async function getParticipantsRecord(eventId: string): Promise<Participan
     slots: string;
     created_at: string;
     updated_at: string;
+    token?: string | null;
   }[];
 
   return rows.map((r) => ({
@@ -128,6 +129,7 @@ export async function getParticipantsRecord(eventId: string): Promise<Participan
     slots: JSON.parse(r.slots || '[]'),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    token: r.token || undefined,
   }));
 }
 
@@ -135,7 +137,8 @@ export async function saveParticipantRecord(
   eventId: string,
   name: string,
   slots: string[],
-  participantId?: string
+  participantId?: string,
+  auth?: { participantToken?: string; adminKey?: string; eventAdminKey?: string }
 ): Promise<Participant> {
   const trimmedName = name.trim();
   const now = new Date().toISOString();
@@ -155,17 +158,34 @@ export async function saveParticipantRecord(
     }
 
     if (existingIndex >= 0) {
+      const existing = participants[existingIndex];
+      // Si el participante ya tiene un token de seguridad, verificar autorización
+      const isOwner = Boolean(
+        !existing.token ||
+        (auth?.participantToken && existing.token && auth.participantToken === existing.token) ||
+        (auth?.adminKey && auth.eventAdminKey && auth.adminKey === auth.eventAdminKey)
+      );
+
+      if (!isOwner) {
+        throw new Error(
+          `El nombre "${trimmedName}" ya ha sido registrado por otro usuario en este evento. Por favor utiliza otro nombre o alias.`
+        );
+      }
+
+      const tokenToKeep = existing.token || crypto.randomBytes(16).toString('hex');
       const updated: Participant = {
-        ...participants[existingIndex],
+        ...existing,
         name: trimmedName,
         slots,
         updatedAt: now,
+        token: tokenToKeep,
       };
       participants[existingIndex] = updated;
       await redis.set(`participants:${eventId}`, JSON.stringify(participants));
       return updated;
     }
 
+    const newToken = crypto.randomBytes(16).toString('hex');
     const newParticipant: Participant = {
       id: crypto.randomUUID(),
       eventId,
@@ -173,6 +193,7 @@ export async function saveParticipantRecord(
       slots,
       createdAt: now,
       updatedAt: now,
+      token: newToken,
     };
     participants.push(newParticipant);
     await redis.set(`participants:${eventId}`, JSON.stringify(participants));
@@ -181,25 +202,39 @@ export async function saveParticipantRecord(
 
   // SQLite fallback
   const db = getDatabase();
-  let existing: { id: string; created_at: string } | undefined;
+  let existing: { id: string; name: string; created_at: string; token?: string | null } | undefined;
 
   if (participantId) {
-    const stmt = db.prepare('SELECT id, created_at FROM participants WHERE id = ? AND event_id = ?');
-    existing = stmt.get(participantId, eventId) as { id: string; created_at: string } | undefined;
+    const stmt = db.prepare('SELECT id, name, created_at, token FROM participants WHERE id = ? AND event_id = ?');
+    existing = stmt.get(participantId, eventId) as typeof existing;
   }
 
   if (!existing) {
-    const stmt = db.prepare('SELECT id, created_at FROM participants WHERE event_id = ? AND LOWER(name) = LOWER(?)');
-    existing = stmt.get(eventId, trimmedName) as { id: string; created_at: string } | undefined;
+    const stmt = db.prepare('SELECT id, name, created_at, token FROM participants WHERE event_id = ? AND LOWER(name) = LOWER(?)');
+    existing = stmt.get(eventId, trimmedName) as typeof existing;
   }
 
   if (existing) {
+    // Si el registro ya existe, verificar que el llamador sea el dueño real
+    const isOwner = Boolean(
+      !existing.token ||
+      (auth?.participantToken && existing.token && auth.participantToken === existing.token) ||
+      (auth?.adminKey && auth.eventAdminKey && auth.adminKey === auth.eventAdminKey)
+    );
+
+    if (!isOwner) {
+      throw new Error(
+        `El nombre "${trimmedName}" ya ha sido registrado por otro usuario en este evento. Por favor utiliza otro nombre o alias.`
+      );
+    }
+
+    const tokenToKeep = existing.token || crypto.randomBytes(16).toString('hex');
     const updateStmt = db.prepare(`
       UPDATE participants 
-      SET name = ?, slots = ?, updated_at = ?
+      SET name = ?, slots = ?, updated_at = ?, token = ?
       WHERE id = ?
     `);
-    updateStmt.run(trimmedName, JSON.stringify(slots), now, existing.id);
+    updateStmt.run(trimmedName, JSON.stringify(slots), now, tokenToKeep, existing.id);
 
     return {
       id: existing.id,
@@ -208,15 +243,17 @@ export async function saveParticipantRecord(
       slots,
       createdAt: existing.created_at,
       updatedAt: now,
+      token: tokenToKeep,
     };
   }
 
   const newId = crypto.randomUUID();
+  const newToken = crypto.randomBytes(16).toString('hex');
   const insertStmt = db.prepare(`
-    INSERT INTO participants (id, event_id, name, slots, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO participants (id, event_id, name, slots, created_at, updated_at, token)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  insertStmt.run(newId, eventId, trimmedName, JSON.stringify(slots), now, now);
+  insertStmt.run(newId, eventId, trimmedName, JSON.stringify(slots), now, now, newToken);
 
   return {
     id: newId,
@@ -225,6 +262,7 @@ export async function saveParticipantRecord(
     slots,
     createdAt: now,
     updatedAt: now,
+    token: newToken,
   };
 }
 

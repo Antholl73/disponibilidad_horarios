@@ -113,9 +113,15 @@ export async function getEventWithHeatmap(id: string): Promise<EventWithHeatmap 
     }
   }
 
+  // Omitir tokens secretos de autorización en las respuestas públicas
+  const safeParticipants = participants.map((p) => {
+    const { token, ...safe } = p;
+    return safe;
+  });
+
   return {
     event,
-    participants,
+    participants: safeParticipants,
     heatmap,
     timeSlots,
   };
@@ -125,15 +131,21 @@ export async function saveParticipantAvailability(
   eventId: string,
   name: string,
   slots: string[],
-  participantId?: string
+  participantId?: string,
+  auth?: { participantToken?: string; adminKey?: string }
 ): Promise<Participant> {
-  return await saveParticipantRecord(eventId, name, slots, participantId);
+  const event = await getEvent(eventId);
+  return await saveParticipantRecord(eventId, name, slots, participantId, {
+    participantToken: auth?.participantToken,
+    adminKey: auth?.adminKey,
+    eventAdminKey: event?.adminKey,
+  });
 }
 
 export async function deleteParticipant(
   eventId: string,
   participantId: string,
-  auth: { adminKey?: string; participantName?: string }
+  auth: { adminKey?: string; participantToken?: string }
 ): Promise<EventWithHeatmap> {
   const event = await getEvent(eventId);
   if (!event) {
@@ -146,17 +158,16 @@ export async function deleteParticipant(
     throw new Error('El participante no fue encontrado en este evento');
   }
 
-  // Comprobar permisos:
+  // Comprobar permisos con tokens criptográficos:
   // 1. Admin: Si se envía adminKey válida que coincide con la clave del evento
-  // 2. Invitado: Solo puede eliminarse a sí mismo (coincide su nombre o ID)
+  // 2. Invitado: Si su participantToken coincide con el token secreto asignado a su registro
   const isAdmin = Boolean(auth.adminKey && event.adminKey && auth.adminKey === event.adminKey);
   const isSelf = Boolean(
-    auth.participantName &&
-    auth.participantName.trim().toLowerCase() === target.name.trim().toLowerCase()
+    auth.participantToken && target.token && auth.participantToken === target.token
   );
 
   if (!isAdmin && !isSelf) {
-    throw new Error('No tienes permiso para eliminar a este participante. Solo el administrador o el propio usuario pueden hacerlo.');
+    throw new Error('No tienes permiso para eliminar a este participante. Solo el administrador o el dueño del horario pueden hacerlo.');
   }
 
   await deleteParticipantRecord(eventId, participantId);
