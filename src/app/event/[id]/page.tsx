@@ -1,23 +1,70 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { getEventWithHeatmap } from '@/lib/services/eventService';
+import { getEventWithHeatmap, createEvent } from '@/lib/services/eventService';
 import EventRoomClient from '@/components/EventRoomClient';
-import { ArrowLeft } from 'lucide-react';
-
-export const dynamic = 'force-dynamic';
+import { ArrowLeft, AlertCircle, PlusCircle } from 'lucide-react';
 
 interface EventPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    t?: string; // title
+    desc?: string; // description
+    m?: string; // mode: dates | days
+    d?: string; // comma-separated dates
+    s?: string; // startHour
+    e?: string; // endHour
+    dur?: string; // slotDuration
+  }>;
 }
 
 export default async function EventPage(props: EventPageProps) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const { id } = params;
 
-  const data = getEventWithHeatmap(id);
+  let data = await getEventWithHeatmap(id);
 
+  // Resilient Recovery: If serverless lambda container does not have the event in /tmp,
+  // reconstruct and persist it on-demand from URL parameters!
+  if (!data && searchParams.t && searchParams.d) {
+    try {
+      const dates = decodeURIComponent(searchParams.d).split(',').filter(Boolean);
+      await createEvent({
+        id,
+        title: decodeURIComponent(searchParams.t),
+        description: searchParams.desc ? decodeURIComponent(searchParams.desc) : undefined,
+        type: searchParams.m === 'days' ? 'days' : 'dates',
+        dates,
+        startHour: Number(searchParams.s) || 9,
+        endHour: Number(searchParams.e) || 18,
+        slotDuration: Number(searchParams.dur) || 30,
+      });
+      data = await getEventWithHeatmap(id);
+    } catch (e) {
+      console.error('Error al recuperar evento desde parámetros de URL:', e);
+    }
+  }
+
+  // Friendly Fallback screen instead of raw 404
   if (!data) {
-    notFound();
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-md w-full text-center shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Evento no encontrado</h1>
+          <p className="text-sm text-slate-600 mb-6">
+            La sala de reunión que buscas no existe o ha expirado. Puedes crear una nueva reunión en cuestión de segundos.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition"
+          >
+            <PlusCircle className="w-4 h-4" /> Crear nueva reunión
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

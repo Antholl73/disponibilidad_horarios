@@ -9,7 +9,7 @@ export async function POST(
     const params = await props.params;
     const { id } = params;
 
-    const event = getEvent(id);
+    const event = await getEvent(id);
     if (!event) {
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
@@ -25,8 +25,8 @@ export async function POST(
       return NextResponse.json({ error: 'Formato de slots inválido' }, { status: 400 });
     }
 
-    const participant = saveParticipantAvailability(id, name, slots, participantId);
-    const updatedData = getEventWithHeatmap(id);
+    const participant = await saveParticipantAvailability(id, name, slots, participantId);
+    const updatedData = await getEventWithHeatmap(id);
 
     return NextResponse.json({
       participant,

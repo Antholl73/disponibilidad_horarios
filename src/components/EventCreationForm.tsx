@@ -34,6 +34,7 @@ export default function EventCreationForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+  const [eventQueryStr, setEventQueryStr] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
   React.useEffect(() => {
@@ -146,7 +147,18 @@ export default function EventCreationForm() {
         throw new Error(data.error || 'Ocurrió un error al crear el evento');
       }
 
+      const query = new URLSearchParams({
+        t: title.trim(),
+        ...(description.trim() ? { desc: description.trim() } : {}),
+        m: mode,
+        d: finalDates.join(','),
+        s: String(startHour),
+        e: String(endHour),
+        dur: String(slotDuration),
+      }).toString();
+
       setCreatedEventId(data.id);
+      setEventQueryStr(query);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al conectar con el servidor';
       setError(message);
@@ -156,7 +168,7 @@ export default function EventCreationForm() {
   };
 
   const eventUrl = typeof window !== 'undefined' && createdEventId
-    ? `${window.location.origin}/event/${createdEventId}`
+    ? `${window.location.origin}/event/${createdEventId}${eventQueryStr ? `?${eventQueryStr}` : ''}`
     : '';
 
   const copyToClipboard = () => {
@@ -214,7 +226,7 @@ export default function EventCreationForm() {
             </a>
 
             <button
-              onClick={() => router.push(`/event/${createdEventId}`)}
+              onClick={() => router.push(`/event/${createdEventId}${eventQueryStr ? `?${eventQueryStr}` : ''}`)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors"
             >
               Ir a la sala del evento <ArrowRight className="w-3.5 h-3.5" />

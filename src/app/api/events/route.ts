@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const durationNum = Number(slotDuration);
     const finalSlotDuration = validDurations.includes(durationNum) ? durationNum : 30;
 
-    const event = createEvent({
+    const event = await createEvent({
       title: title.trim(),
       description: description?.trim(),
       type,

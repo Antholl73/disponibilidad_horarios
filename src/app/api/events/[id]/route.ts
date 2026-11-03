@@ -9,7 +9,7 @@ export async function GET(
     const params = await props.params;
     const { id } = params;
 
-    const data = getEventWithHeatmap(id);
+    const data = await getEventWithHeatmap(id);
     if (!data) {
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
