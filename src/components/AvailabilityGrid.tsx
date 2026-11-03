@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Event } from '@/types';
+import { Event, SlotAvailability } from '@/types';
 import {
   Check,
   CheckCheck,
   Sparkles,
   Info,
   Hand,
-  Paintbrush
+  Paintbrush,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface AvailabilityGridProps {
@@ -18,6 +20,8 @@ interface AvailabilityGridProps {
   participantName: string;
   onSave: (slots: string[]) => Promise<void>;
   isSaving: boolean;
+  heatmap?: Record<string, SlotAvailability>;
+  totalParticipants?: number;
 }
 
 export default function AvailabilityGrid({
@@ -27,10 +31,13 @@ export default function AvailabilityGrid({
   participantName,
   onSave,
   isSaving,
+  heatmap,
+  totalParticipants = 0,
 }: AvailabilityGridProps) {
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(() => new Set(initialSlots));
   const [hasChanges, setHasChanges] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [showGroupHints, setShowGroupHints] = useState(true);
 
   // Mobile mode: 'scroll' allows native swipe/scroll and tap to select; 'paint' allows continuous drag painting
   const [mobileMode, setMobileMode] = useState<'scroll' | 'paint'>('scroll');
@@ -110,7 +117,6 @@ export default function AvailabilityGrid({
 
   // Desktop Mouse Handlers
   const handleMouseDown = (slotKey: string) => {
-    // If triggered by a touch event, ignore synthetic mouse event
     if (isTouchRef.current) return;
     startDrag(slotKey);
   };
@@ -120,10 +126,8 @@ export default function AvailabilityGrid({
     isTouchRef.current = true;
 
     if (mobileMode === 'paint') {
-      // In Paint mode: start dragging immediately
       startDrag(slotKey);
     } else {
-      // In Scroll/Tap mode: record touch start to check if it's a tap or scroll
       const touch = e.touches[0];
       touchStartRef.current = {
         x: touch.clientX,
@@ -151,7 +155,6 @@ export default function AvailabilityGrid({
       touchStartRef.current = null;
     }
 
-    // Reset touch flag shortly after to allow mouse on hybrid devices
     setTimeout(() => {
       isTouchRef.current = false;
     }, 400);
@@ -230,8 +233,8 @@ export default function AvailabilityGrid({
           </span>
           <span className="sm:hidden text-[11px]">
             {mobileMode === 'scroll'
-              ? 'Modo Tocar activo: desliza libremente y toca cualquier celda para marcarla.'
-              : 'Modo Pintar activo: arrastra el dedo para pintar múltiples celdas.'}
+              ? 'Modo Tocar activo: desliza libremente y toca una celda para marcarla.'
+              : 'Modo Pintar activo: arrastra el dedo para pintar bloques.'}
           </span>
         </div>
 
@@ -262,6 +265,23 @@ export default function AvailabilityGrid({
             </button>
           </div>
 
+          {/* Group hints toggle if participants exist */}
+          {totalParticipants > 0 && heatmap && (
+            <button
+              type="button"
+              onClick={() => setShowGroupHints(!showGroupHints)}
+              title="Mostrar u ocultar cuántos compañeros ya están libres en cada bloque"
+              className={`hidden md:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition shadow-2xs ${
+                showGroupHints
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {showGroupHints ? <Eye className="w-3.5 h-3.5 text-emerald-600" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span>{showGroupHints ? 'Ver grupo de fondo' : 'Ocultar grupo'}</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -281,9 +301,9 @@ export default function AvailabilityGrid({
         </div>
       </div>
 
-      {/* Grid Container with Sticky Column & Row */}
+      {/* Grid Container with Solid Sticky Column & Clean Stacking */}
       <div
-        className={`overflow-x-auto pb-4 cursor-pointer rounded-2xl border border-slate-300 shadow-xs bg-white ${
+        className={`overflow-x-auto pb-4 cursor-pointer rounded-2xl border border-slate-300 shadow-xs bg-white isolate ${
           mobileMode === 'paint' ? 'touch-none' : 'touch-pan-x touch-pan-y'
         }`}
         onTouchMove={handleTouchMove}
@@ -292,11 +312,11 @@ export default function AvailabilityGrid({
         <div className="inline-block min-w-full align-middle">
           {/* Day Header Row */}
           <div
-            className="grid bg-slate-100 border-b border-slate-300 text-center text-xs font-semibold text-slate-700 sticky top-0 z-20"
+            className="grid bg-slate-100 border-b border-slate-300 text-center text-xs font-semibold text-slate-700 sticky top-0 z-30"
             style={{ gridTemplateColumns: `70px repeat(${event.dates.length}, minmax(100px, 1fr))` }}
           >
-            {/* Sticky Top-Left Corner */}
-            <div className="p-2.5 border-r border-slate-300 bg-slate-200/90 sticky left-0 z-30 flex items-center justify-center text-slate-600 font-mono text-[11px] shadow-xs">
+            {/* Sticky Top-Left Corner (Solid Opaque, Highest Z-Index) */}
+            <div className="p-2.5 border-r border-slate-300 bg-slate-200 sticky left-0 z-40 flex items-center justify-center text-slate-700 font-mono text-[11px] shadow-[2px_0_4px_-1px_rgba(0,0,0,0.08)]">
               Hora
             </div>
             {event.dates.map((date) => (
@@ -304,7 +324,7 @@ export default function AvailabilityGrid({
                 key={date}
                 onClick={() => handleToggleColumn(date)}
                 title="Toca para alternar todo este día"
-                className="p-2.5 border-r last:border-r-0 border-slate-300 hover:bg-indigo-50/80 active:bg-indigo-100 transition cursor-pointer flex flex-col items-center justify-center"
+                className="p-2.5 border-r last:border-r-0 border-slate-300 hover:bg-indigo-50/80 active:bg-indigo-100 transition cursor-pointer flex flex-col items-center justify-center bg-slate-100"
               >
                 <span className="truncate max-w-[120px] font-bold">{date}</span>
                 <span className="text-[10px] text-indigo-600 font-normal hover:underline">Alternar</span>
@@ -320,15 +340,17 @@ export default function AvailabilityGrid({
                 className="grid text-center"
                 style={{ gridTemplateColumns: `70px repeat(${event.dates.length}, minmax(100px, 1fr))` }}
               >
-                {/* Sticky Left Column: Time label */}
-                <div className="p-2 font-mono text-[11px] text-slate-600 bg-slate-100/95 sticky left-0 z-10 border-r border-slate-300 flex items-center justify-center shadow-xs">
+                {/* Sticky Left Column: Solid Opaque z-20 so day cells slide UNDERNEATH */}
+                <div className="p-2 font-mono text-[11px] text-slate-700 bg-slate-100 sticky left-0 z-20 border-r border-slate-300 flex items-center justify-center shadow-[2px_0_4px_-1px_rgba(0,0,0,0.08)]">
                   {time}
                 </div>
 
-                {/* Day cells */}
+                {/* Day cells (relative z-0 so they ALWAYS pass under the sticky column) */}
                 {event.dates.map((date) => {
                   const slotKey = `${date}_${time}`;
                   const isSelected = selectedSlots.has(slotKey);
+                  const groupSlot = heatmap ? heatmap[slotKey] : undefined;
+                  const groupCount = groupSlot?.availableCount || 0;
 
                   return (
                     <div
@@ -338,13 +360,23 @@ export default function AvailabilityGrid({
                       onMouseEnter={() => handleMouseEnter(slotKey)}
                       onTouchStart={(e) => handleCellTouchStart(slotKey, e)}
                       onTouchEnd={handleCellTouchEnd}
-                      className={`h-10 sm:h-9 border-r last:border-r-0 border-slate-200 transition-colors flex items-center justify-center text-[11px] font-medium ${
+                      className={`h-10 sm:h-9 border-r last:border-r-0 border-slate-200 transition-colors flex items-center justify-center text-[11px] font-medium relative z-0 ${
                         isSelected
                           ? 'bg-emerald-500 text-white font-semibold'
+                          : showGroupHints && groupCount > 0
+                          ? 'bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/70'
                           : 'bg-white hover:bg-indigo-50/40 active:bg-indigo-100/60 text-transparent'
                       }`}
                     >
-                      {isSelected ? '✓ Libre' : ''}
+                      {isSelected ? (
+                        '✓ Libre'
+                      ) : showGroupHints && groupCount > 0 ? (
+                        <span className="text-[10px] text-emerald-700/80 font-mono">
+                          {groupCount} libre{groupCount > 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        ''
+                      )}
                     </div>
                   );
                 })}

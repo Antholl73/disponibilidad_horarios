@@ -234,19 +234,19 @@ export default function GroupHeatmap({
       </div>
 
       {/* Heatmap Grid with Sticky Column & Row */}
-      <div className="overflow-x-auto pb-4 rounded-2xl border border-slate-300 shadow-xs bg-white">
+      <div className="overflow-x-auto pb-4 rounded-2xl border border-slate-300 shadow-xs bg-white isolate">
         <div className="inline-block min-w-full align-middle">
           {/* Header Row */}
           <div
-            className="grid bg-slate-100 border-b border-slate-300 text-center text-xs font-semibold text-slate-700 sticky top-0 z-20"
+            className="grid bg-slate-100 border-b border-slate-300 text-center text-xs font-semibold text-slate-700 sticky top-0 z-30"
             style={{ gridTemplateColumns: `70px repeat(${event.dates.length}, minmax(100px, 1fr))` }}
           >
-            {/* Sticky Top-Left Corner */}
-            <div className="p-2.5 border-r border-slate-300 bg-slate-200/90 sticky left-0 z-30 flex items-center justify-center text-slate-600 font-mono text-[11px] shadow-xs">
+            {/* Sticky Top-Left Corner (Solid Opaque, Highest Z-Index) */}
+            <div className="p-2.5 border-r border-slate-300 bg-slate-200 sticky left-0 z-40 flex items-center justify-center text-slate-700 font-mono text-[11px] shadow-[2px_0_4px_-1px_rgba(0,0,0,0.08)]">
               Hora
             </div>
             {event.dates.map((date) => (
-              <div key={date} className="p-2.5 border-r last:border-r-0 border-slate-300 truncate font-bold">
+              <div key={date} className="p-2.5 border-r last:border-r-0 border-slate-300 truncate font-bold bg-slate-100">
                 {date}
               </div>
             ))}
@@ -260,12 +260,12 @@ export default function GroupHeatmap({
                 className="grid text-center"
                 style={{ gridTemplateColumns: `70px repeat(${event.dates.length}, minmax(100px, 1fr))` }}
               >
-                {/* Sticky Left Column: Time label */}
-                <div className="p-2 font-mono text-[11px] text-slate-600 bg-slate-100/95 sticky left-0 z-10 border-r border-slate-300 flex items-center justify-center shadow-xs">
+                {/* Sticky Left Column: Solid Opaque z-20 so day cells slide UNDERNEATH */}
+                <div className="p-2 font-mono text-[11px] text-slate-700 bg-slate-100 sticky left-0 z-20 border-r border-slate-300 flex items-center justify-center shadow-[2px_0_4px_-1px_rgba(0,0,0,0.08)]">
                   {time}
                 </div>
 
-                {/* Day cells */}
+                {/* Day cells (relative z-0 so they ALWAYS pass under the sticky column) */}
                 {event.dates.map((date) => {
                   const slotKey = `${date}_${time}`;
                   const slot = heatmap[slotKey];
@@ -277,10 +277,10 @@ export default function GroupHeatmap({
                       key={slotKey}
                       onMouseEnter={() => setActiveSlotKey(slotKey)}
                       onClick={() => setActiveSlotKey(slotKey)}
-                      className={`h-10 sm:h-9 border-r last:border-r-0 border-slate-200 transition cursor-pointer flex items-center justify-center text-[10px] sm:text-[11px] select-none ${
+                      className={`h-10 sm:h-9 border-r last:border-r-0 border-slate-200 transition cursor-pointer flex items-center justify-center text-[10px] sm:text-[11px] select-none relative ${
                         style.bg
                       } ${style.text} ${
-                        isActive ? 'ring-2 ring-indigo-600 z-10 scale-[1.03] shadow-md' : ''
+                        isActive ? 'ring-2 ring-indigo-600 z-10 scale-[1.03] shadow-md' : 'z-0'
                       }`}
                     >
                       {totalParticipants > 0 && slot && slot.availableCount > 0 ? (

@@ -51,6 +51,27 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
     }
   }, [event.id]);
 
+  // Real-time synchronization to fetch other participants' responses without needing to save first
+  const refreshEventData = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/events/${event.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && Array.isArray(json.participants)) {
+          setData(json);
+        }
+      }
+    } catch (err) {
+      console.warn('Error al sincronizar participantes:', err);
+    }
+  }, [event.id]);
+
+  useEffect(() => {
+    refreshEventData();
+    const timer = setInterval(refreshEventData, 8000);
+    return () => clearInterval(timer);
+  }, [refreshEventData]);
+
   const eventUrl = typeof window !== 'undefined' ? window.location.href : '';
 
   const copyToClipboard = () => {
@@ -248,8 +269,8 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Column: Participant identity & list */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Identity Box */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+          {/* Identity Box (Desktop only, mobile has it inside Tab 1) */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
             <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm mb-3">
               <User className="w-4 h-4 text-indigo-600" />
               ¿Quién eres tú?
@@ -300,14 +321,12 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
                       type="button"
                       key={p.id}
                       onClick={() => {
-                        if (activeTab === 'group-schedule') {
-                          setHighlightedParticipant(isHighlighted ? null : p);
-                        } else {
-                          setParticipantName(p.name);
-                        }
+                        setHighlightedParticipant(isHighlighted && activeTab === 'group-schedule' ? null : p);
+                        setActiveTab('group-schedule');
                       }}
+                      title="Haz clic para ver los horarios guardados por esta persona"
                       className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition border ${
-                        isHighlighted
+                        isHighlighted && activeTab === 'group-schedule'
                           ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
                           : isCurrent
                           ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold'
@@ -316,7 +335,7 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
                     >
                       <span className="truncate">{p.name} {isCurrent && '(Tú)'}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                        isHighlighted
+                        isHighlighted && activeTab === 'group-schedule'
                           ? 'bg-indigo-700 text-white border-indigo-600'
                           : 'text-slate-500 bg-white border-slate-200'
                       }`}>
@@ -384,6 +403,25 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
                   )}
                 </div>
 
+                {/* Notice if participants already answered */}
+                {participants.length > 0 && (
+                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Users className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span>
+                        Ya hay <strong>{participants.length}</strong> {participants.length === 1 ? 'persona con horarios guardados' : 'personas con horarios guardados'}. Puedes consultar sus respuestas en cualquier momento.
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('group-schedule')}
+                      className="font-bold text-emerald-700 hover:text-emerald-900 underline text-left sm:text-right flex-shrink-0"
+                    >
+                      Ver disponibilidad grupal ➔
+                    </button>
+                  </div>
+                )}
+
                 {!participantName.trim() && (
                   <div className="hidden sm:flex mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl items-center gap-2">
                     <User className="w-4 h-4 text-amber-600 flex-shrink-0" />
@@ -400,6 +438,8 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
                   participantName={participantName}
                   onSave={handleSaveAvailability}
                   isSaving={isSaving}
+                  heatmap={heatmap}
+                  totalParticipants={participants.length}
                 />
               </div>
             )}
