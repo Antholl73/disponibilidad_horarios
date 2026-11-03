@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getEventWithHeatmap, createEvent } from '@/lib/services/eventService';
+import { isCloudStorageEnabled } from '@/lib/storage';
+
+function safeDecode(val: string | null): string {
+  if (!val) return '';
+  try {
+    return decodeURIComponent(val);
+  } catch {
+    return val;
+  }
+}
 
 export async function GET(
   request: Request,
@@ -21,10 +31,10 @@ export async function GET(
         try {
           await createEvent({
             id,
-            title: decodeURIComponent(t),
-            description: url.searchParams.get('desc') ? decodeURIComponent(url.searchParams.get('desc')!) : undefined,
+            title: safeDecode(t),
+            description: url.searchParams.get('desc') ? safeDecode(url.searchParams.get('desc')) : undefined,
             type: url.searchParams.get('m') === 'days' ? 'days' : 'dates',
-            dates: decodeURIComponent(d).split(',').filter(Boolean),
+            dates: safeDecode(d).split(',').filter(Boolean),
             startHour: Number(url.searchParams.get('s')) || 9,
             endHour: Number(url.searchParams.get('e')) || 18,
             slotDuration: Number(url.searchParams.get('dur')) || 30,
@@ -53,6 +63,7 @@ export async function GET(
       ...data,
       event: safeEvent,
       isAdmin,
+      isCloudStorage: isCloudStorageEnabled(),
     });
   } catch (error) {
     console.error('Error al obtener evento:', error);

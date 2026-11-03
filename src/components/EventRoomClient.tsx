@@ -48,6 +48,8 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
   const [isAdmin, setIsAdmin] = useState<boolean>(Boolean(initialData.isAdmin));
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminInput, setAdminInput] = useState('');
+  const [isCloudStorage, setIsCloudStorage] = useState<boolean | null>(null);
+  const [dismissCloudTip, setDismissCloudTip] = useState(false);
 
   // Delete participant state & confirmation modal
   const [participantToDelete, setParticipantToDelete] = useState<Participant | null>(null);
@@ -88,12 +90,104 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
     }
   }, [event.id, adminKey]);
 
+  const shareQuery = React.useMemo(() => {
+    return new URLSearchParams({
+      t: event.title,
+      ...(event.description ? { desc: event.description } : {}),
+      m: event.type,
+      d: event.dates.join(','),
+      s: String(event.startHour),
+      e: String(event.endHour),
+      dur: String(event.slotDuration),
+    }).toString();
+  }, [event]);
+
+  const hasAutoRehydratedRef = React.useRef(false);
+
+  // Auto-rehydrate local availability if server lambda restarted and lost temporary state
+  const checkAndAutoRehydrate = React.useCallback(
+    async (serverParticipants: Participant[]) => {
+      if (typeof window === 'undefined') return;
+      if (hasAutoRehydratedRef.current) return;
+
+      const savedName = localStorage.getItem(`disponi_name_${event.id}`)?.trim();
+      const rawSlots = localStorage.getItem(`disponi_slots_${event.id}`);
+      const savedToken = localStorage.getItem(`disponi_token_${event.id}`) || participantToken;
+      const savedPid = localStorage.getItem(`disponi_pid_${event.id}`) || myParticipantId;
+
+      if (!savedName || !rawSlots) return;
+
+      let savedSlots: string[] = [];
+      try {
+        savedSlots = JSON.parse(rawSlots);
+      } catch {
+        return;
+      }
+
+      if (savedSlots.length === 0) return;
+
+      // Check if this participant is already present on the server
+      const isAlreadyOnServer = serverParticipants.some((p) => {
+        if (savedPid && p.id === savedPid) return true;
+        if (p.name.trim().toLowerCase() === savedName.toLowerCase()) return true;
+        return false;
+      });
+
+      if (!isAlreadyOnServer) {
+        hasAutoRehydratedRef.current = true;
+        try {
+          const currentAdm = adminKey || localStorage.getItem(`disponi_adm_${event.id}`) || undefined;
+          const res = await fetch(`/api/events/${event.id}/participants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: savedName,
+              slots: savedSlots,
+              participantId: savedPid || undefined,
+              participantToken: savedToken || undefined,
+              adminKey: currentAdm,
+              event: {
+                title: event.title,
+                description: event.description,
+                type: event.type,
+                dates: event.dates,
+                startHour: event.startHour,
+                endHour: event.endHour,
+                slotDuration: event.slotDuration,
+                adminKey: currentAdm,
+              },
+            }),
+          });
+
+          if (res.ok) {
+            const json = await res.json();
+            if (json.updatedData) {
+              setData(json.updatedData);
+            }
+            if (json.participant?.token) {
+              setParticipantToken(json.participant.token);
+              localStorage.setItem(`disponi_token_${event.id}`, json.participant.token);
+            }
+            if (json.participant?.id) {
+              setMyParticipantId(json.participant.id);
+              localStorage.setItem(`disponi_pid_${event.id}`, json.participant.id);
+            }
+            console.log('Horarios auto-sincronizados desde almacenamiento local.');
+          }
+        } catch (err) {
+          console.warn('Error al auto-sincronizar disponibilidad:', err);
+        }
+      }
+    },
+    [event, adminKey, participantToken, myParticipantId]
+  );
+
   // Real-time synchronization to fetch other participants' responses
   const refreshEventData = React.useCallback(async () => {
     try {
       const currentKey = adminKey || (typeof window !== 'undefined' ? localStorage.getItem(`disponi_adm_${event.id}`) : null);
       const headers: HeadersInit = currentKey ? { 'x-admin-key': currentKey } : {};
-      const res = await fetch(`/api/events/${event.id}`, { headers });
+      const res = await fetch(`/api/events/${event.id}?${shareQuery}`, { headers });
       if (res.ok) {
         const json = await res.json();
         if (json && Array.isArray(json.participants)) {
@@ -101,12 +195,16 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
           if (typeof json.isAdmin === 'boolean') {
             setIsAdmin(json.isAdmin);
           }
+          if (typeof json.isCloudStorage === 'boolean') {
+            setIsCloudStorage(json.isCloudStorage);
+          }
+          checkAndAutoRehydrate(json.participants);
         }
       }
     } catch (err) {
       console.warn('Error al sincronizar participantes:', err);
     }
-  }, [event.id, adminKey]);
+  }, [event.id, adminKey, shareQuery, checkAndAutoRehydrate]);
 
   useEffect(() => {
     refreshEventData();
@@ -132,18 +230,6 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
         );
       } catch {}
     }
-  }, [event]);
-
-  const shareQuery = React.useMemo(() => {
-    return new URLSearchParams({
-      t: event.title,
-      ...(event.description ? { desc: event.description } : {}),
-      m: event.type,
-      d: event.dates.join(','),
-      s: String(event.startHour),
-      e: String(event.endHour),
-      dur: String(event.slotDuration),
-    }).toString();
   }, [event]);
 
   const eventUrl = typeof window !== 'undefined'
@@ -443,6 +529,32 @@ export default function EventRoomClient({ initialData, initialAdminKey }: EventR
 
   return (
     <div className="space-y-6">
+      {/* Cloud Persistence Notice for Admin */}
+      {isAdmin && isCloudStorage === false && !dismissCloudTip && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 border border-amber-200 dark:border-amber-800/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <AlertCircle className="w-4 h-4" />
+            </div>
+            <div>
+              <strong className="font-bold text-amber-900 dark:text-amber-200 text-xs sm:text-sm">
+                Aviso de Persistencia (Almacenamiento Temporal en Vercel)
+              </strong>
+              <p className="mt-1 text-amber-800/90 dark:text-amber-300/90 leading-relaxed text-[11px] sm:text-xs">
+                Esta aplicación está funcionando en una función Serverless sin base de datos en la nube vinculada. Vercel apaga los contenedores inactivos y borra el archivo temporal tras unos minutos. Para guardar los horarios de forma permanente y gratuita, vincula <strong>Upstash Redis</strong> o <strong>Vercel KV</strong> en tu panel de Vercel.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDismissCloudTip(true)}
+            className="text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-100 font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-100/60 dark:hover:bg-amber-900/40 transition cursor-pointer flex-shrink-0 self-end sm:self-center"
+          >
+            Ocultar aviso
+          </button>
+        </div>
+      )}
+
       {/* Event Header Card */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
