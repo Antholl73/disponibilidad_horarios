@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { EventWithHeatmap } from '@/types';
+import { EventWithHeatmap, Participant } from '@/types';
 import AvailabilityGrid from '@/components/AvailabilityGrid';
+import GroupHeatmap from '@/components/GroupHeatmap';
 import {
   Calendar,
   Clock,
@@ -14,7 +15,8 @@ import {
   User,
   Sparkles,
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
 
 interface EventRoomClientProps {
@@ -23,13 +25,14 @@ interface EventRoomClientProps {
 
 export default function EventRoomClient({ initialData }: EventRoomClientProps) {
   const [data, setData] = useState<EventWithHeatmap>(initialData);
-  const { event, participants, timeSlots } = data;
+  const { event, participants, timeSlots, heatmap } = data;
 
   const [activeTab, setActiveTab] = useState<'my-schedule' | 'group-schedule'>('my-schedule');
   const [participantName, setParticipantName] = useState('');
+  const [highlightedParticipant, setHighlightedParticipant] = useState<Participant | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string; showSwitchTab?: boolean } | null>(null);
 
   // Restore remembered participant name for this event
   useEffect(() => {
@@ -87,8 +90,11 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
         localStorage.setItem(`disponi_name_${event.id}`, participantName.trim());
       }
 
-      setNotification('¡Tus horarios han sido guardados exitosamente!');
-      setTimeout(() => setNotification(null), 4000);
+      setNotification({
+        message: '¡Tus horarios han sido guardados exitosamente!',
+        showSwitchTab: true,
+      });
+      setTimeout(() => setNotification(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al guardar';
       alert(msg);
@@ -177,9 +183,21 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
 
       {/* Notification Toast */}
       {notification && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-xl flex items-center gap-2 shadow-2xs animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-          {notification}
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span className="font-medium">{notification.message}</span>
+          </div>
+
+          {notification.showSwitchTab && activeTab === 'my-schedule' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('group-schedule')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition shadow-xs self-start sm:self-auto"
+            >
+              Ver disponibilidad grupal <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )}
 
@@ -233,20 +251,33 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
               <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                 {participants.map((p) => {
                   const isCurrent = p.name.trim().toLowerCase() === participantName.trim().toLowerCase();
+                  const isHighlighted = highlightedParticipant?.id === p.id;
                   return (
                     <button
                       type="button"
                       key={p.id}
-                      onClick={() => setParticipantName(p.name)}
+                      onClick={() => {
+                        if (activeTab === 'group-schedule') {
+                          setHighlightedParticipant(isHighlighted ? null : p);
+                        } else {
+                          setParticipantName(p.name);
+                        }
+                      }}
                       className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition border ${
-                        isCurrent
+                        isHighlighted
+                          ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
+                          : isCurrent
                           ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold'
                           : 'bg-slate-50 border-transparent hover:bg-slate-100 text-slate-700'
                       }`}
                     >
                       <span className="truncate">{p.name} {isCurrent && '(Tú)'}</span>
-                      <span className="text-[10px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                        {p.slots.length} horas
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                        isHighlighted
+                          ? 'bg-indigo-700 text-white border-indigo-600'
+                          : 'text-slate-500 bg-white border-slate-200'
+                      }`}>
+                        {p.slots.length} bloques
                       </span>
                     </button>
                   );
@@ -311,32 +342,37 @@ export default function EventRoomClient({ initialData }: EventRoomClientProps) {
               </div>
             )}
 
-            {/* Tab 2: Group Availability Preview (will become the full heatmap in Phase 4) */}
+            {/* Tab 2: Group Heatmap */}
             {activeTab === 'group-schedule' && (
-              <div className="text-center py-10">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
-                  <Flame className="w-6 h-6" />
-                </div>
-                <h3 className="text-base font-bold text-slate-900 mb-1">
-                  Disponibilidad grupal agregada
-                </h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto mb-6">
-                  {participants.length === 0
-                    ? 'Aún no hay respuestas registradas. Cuando los miembros marquen sus horas, aquí se creará automáticamente el mapa de calor.'
-                    : `Actualmente hay ${participants.length} participante(s) registrado(s).`}
-                </p>
-
-                {participants.length > 0 && (
-                  <div className="inline-flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
-                    {participants.map((p) => (
-                      <span
-                        key={p.id}
-                        className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg"
-                      >
-                        ✓ {p.name} ({p.slots.length} bloques marcados)
-                      </span>
-                    ))}
+              <div>
+                {participants.length === 0 ? (
+                  <div className="text-center py-12 px-4 border border-dashed border-slate-300 rounded-2xl bg-slate-50/50">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                      <Flame className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 mb-1">
+                      Aún no hay respuestas en este evento
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mb-5">
+                      Para ver el mapa de calor grupal, comparte el enlace o marca tus horas en la pestaña &quot;Marcar mis horarios libres&quot;.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('my-schedule')}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Marcar mis horarios ahora
+                    </button>
                   </div>
+                ) : (
+                  <GroupHeatmap
+                    event={event}
+                    timeSlots={timeSlots}
+                    participants={participants}
+                    heatmap={heatmap}
+                    highlightedParticipant={highlightedParticipant}
+                    onSelectParticipant={setHighlightedParticipant}
+                  />
                 )}
               </div>
             )}
