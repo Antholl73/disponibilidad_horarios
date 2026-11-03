@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getEventWithHeatmap, createEvent } from '@/lib/services/eventService';
 import EventRoomClient from '@/components/EventRoomClient';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { ArrowLeft, AlertCircle, PlusCircle } from 'lucide-react';
 
 interface EventPageProps {
@@ -47,13 +48,13 @@ export default async function EventPage(props: EventPageProps) {
   // Friendly Fallback screen instead of raw 404
   if (!data) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-md w-full text-center shadow-sm">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 max-w-md w-full text-center shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-bold text-slate-900 mb-2">Evento no encontrado</h1>
-          <p className="text-sm text-slate-600 mb-6">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Evento no encontrado</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
             La sala de reunión que buscas no existe o ha expirado. Puedes crear una nueva reunión en cuestión de segundos.
           </p>
           <Link
@@ -68,20 +69,23 @@ export default async function EventPage(props: EventPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-150">
       {/* Top Navigation */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-30 shadow-2xs">
+      <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 transition"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
           >
             <ArrowLeft className="w-4 h-4" /> Volver al inicio
           </Link>
 
-          <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full">
-            Sala de Coordinación
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 rounded-full">
+              Sala de Coordinación
+            </span>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

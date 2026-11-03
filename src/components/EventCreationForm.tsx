@@ -182,12 +182,12 @@ export default function EventCreationForm() {
     <div className="w-full max-w-2xl mx-auto">
       {/* Modal / Alerta de éxito si se acaba de crear */}
       {createdEventId && (
-        <div className="mb-8 p-6 bg-emerald-50 border border-emerald-200 rounded-2xl shadow-sm text-left">
-          <div className="flex items-center gap-3 text-emerald-800 font-semibold text-lg mb-2">
-            <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+        <div className="mb-8 p-6 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 rounded-2xl shadow-sm text-left">
+          <div className="flex items-center gap-3 text-emerald-800 dark:text-emerald-300 font-semibold text-lg mb-2">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             ¡Tu reunión ha sido creada exitosamente!
           </div>
-          <p className="text-emerald-700 text-sm mb-4">
+          <p className="text-emerald-700 dark:text-emerald-400 text-sm mb-4">
             Copia este enlace y compártelo en tu grupo de WhatsApp, Slack o correo para que todos marquen sus horarios libres:
           </p>
 
@@ -196,7 +196,7 @@ export default function EventCreationForm() {
               type="text"
               readOnly
               value={eventUrl}
-              className="flex-1 px-4 py-2.5 bg-white border border-emerald-300 rounded-xl text-slate-800 text-sm font-mono select-all focus:outline-none"
+              className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded-xl text-slate-800 dark:text-slate-200 text-sm font-mono select-all focus:outline-none"
             />
             <button
               onClick={copyToClipboard}
@@ -215,19 +215,19 @@ export default function EventCreationForm() {
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-emerald-200/60">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/60">
             <a
               href={`https://wa.me/?text=${encodeURIComponent(`Hola! Marquemos nuestros horarios disponibles para "${title}" aquí: ${eventUrl}`)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:text-emerald-950 dark:hover:text-emerald-100 transition-colors"
             >
               <Share2 className="w-3.5 h-3.5" /> Compartir en WhatsApp
             </a>
 
             <button
               onClick={() => router.push(`/event/${createdEventId}${eventQueryStr ? `?${eventQueryStr}` : ''}`)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors"
             >
               Ir a la sala del evento <ArrowRight className="w-3.5 h-3.5" />
             </button>
@@ -236,62 +236,62 @@ export default function EventCreationForm() {
       )}
 
       {/* Formulario de creación */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 text-left">
-        <div className="flex items-center gap-2 text-indigo-600 font-semibold text-sm mb-1">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 text-left">
+        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-sm mb-1">
           <Sparkles className="w-4 h-4" /> Nueva Consulta de Disponibilidad
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-6">
           Configurar reunión grupal
         </h2>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm rounded-xl">
             {error}
           </div>
         )}
 
         {/* Título */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
             Nombre de la reunión o evento <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             required
-            placeholder="Ej: Reunión de Proyecto, Salida del fin de semana, etc."
+            placeholder="Nombre de la reunión o evento"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-slate-900 placeholder-slate-400 text-sm"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm"
           />
         </div>
 
         {/* Descripción */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
             Descripción o notas (opcional)
           </label>
           <textarea
             rows={2}
-            placeholder="Ej: Definiremos los temas pendientes y la fecha de entrega..."
+            placeholder="Descripción o notas adicionales (opcional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-slate-900 placeholder-slate-400 text-sm resize-none"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm resize-none"
           />
         </div>
 
         {/* Selector de Modo: Fechas vs Días */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Tipo de días para coordinar
           </label>
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-4">
+          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
             <button
               type="button"
               onClick={() => setMode('dates')}
               className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
                 mode === 'dates'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <CalendarDays className="w-4 h-4" /> Fechas específicas
@@ -301,8 +301,8 @@ export default function EventCreationForm() {
               onClick={() => setMode('days')}
               className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
                 mode === 'days'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <ListFilter className="w-4 h-4" /> Días de la semana
@@ -313,22 +313,22 @@ export default function EventCreationForm() {
           {mode === 'dates' && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   Selecciona los días a evaluar ({selectedDates.length} seleccionados):
                 </span>
                 <div className="flex gap-1.5 text-xs">
                   <button
                     type="button"
                     onClick={() => handleQuickDates('next3')}
-                    className="text-indigo-600 hover:text-indigo-800 underline font-medium"
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 underline font-medium"
                   >
                     Próximos 3 días
                   </button>
-                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-300 dark:text-slate-600">|</span>
                   <button
                     type="button"
                     onClick={() => handleQuickDates('week')}
-                    className="text-indigo-600 hover:text-indigo-800 underline font-medium"
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 underline font-medium"
                   >
                     Esta semana
                   </button>
@@ -345,13 +345,13 @@ export default function EventCreationForm() {
                       onClick={() => toggleDate(item.dateStr)}
                       className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs transition ${
                         isSelected
-                          ? 'bg-indigo-50 border-indigo-500 text-indigo-900 font-bold shadow-xs'
-                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                          ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 dark:border-indigo-400 text-indigo-900 dark:text-indigo-200 font-bold shadow-xs'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
                       }`}
                     >
                       <span className="capitalize text-[11px] font-medium opacity-75">{item.dayName}</span>
                       <span className="text-base font-semibold">{item.dayNumber}</span>
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500">{item.monthName}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">{item.monthName}</span>
                     </button>
                   );
                 })}
@@ -363,22 +363,22 @@ export default function EventCreationForm() {
           {mode === 'days' && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   Elige los días de la semana:
                 </span>
                 <div className="flex gap-1.5 text-xs">
                   <button
                     type="button"
                     onClick={() => setSelectedDays(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])}
-                    className="text-indigo-600 hover:text-indigo-800 underline font-medium"
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 underline font-medium"
                   >
                     Lunes a Viernes
                   </button>
-                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-300 dark:text-slate-600">|</span>
                   <button
                     type="button"
                     onClick={() => setSelectedDays([...DAYS_OF_WEEK])}
-                    className="text-indigo-600 hover:text-indigo-800 underline font-medium"
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 underline font-medium"
                   >
                     Todos
                   </button>
@@ -396,7 +396,7 @@ export default function EventCreationForm() {
                       className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${
                         isSelected
                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                       }`}
                     >
                       {day}
@@ -409,22 +409,22 @@ export default function EventCreationForm() {
         </div>
 
         {/* Rango Horario */}
-        <div className="mb-8 pt-4 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-3">
-            <Clock className="w-4 h-4 text-indigo-600" />
+        <div className="mb-8 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+            <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             Franja de horarios a consultar
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Hora de inicio</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Hora de inicio</label>
               <select
                 value={startHour}
                 onChange={(e) => setStartHour(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
                 {Array.from({ length: 24 }).map((_, i) => (
-                  <option key={i} value={i} disabled={i >= endHour}>
+                  <option key={i} value={i} disabled={i >= endHour} className="dark:bg-slate-800">
                     {String(i).padStart(2, '0')}:00
                   </option>
                 ))}
@@ -432,16 +432,16 @@ export default function EventCreationForm() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Hora de fin</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Hora de fin</label>
               <select
                 value={endHour}
                 onChange={(e) => setEndHour(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
                 {Array.from({ length: 24 }).map((_, i) => {
                   const h = i + 1;
                   return (
-                    <option key={h} value={h} disabled={h <= startHour}>
+                    <option key={h} value={h} disabled={h <= startHour} className="dark:bg-slate-800">
                       {String(h).padStart(2, '0')}:00
                     </option>
                   );
@@ -450,16 +450,16 @@ export default function EventCreationForm() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Intervalos</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Intervalos</label>
               <select
                 value={slotDuration}
                 onChange={(e) => setSlotDuration(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
-                <option value={15}>15 minutos</option>
-                <option value={30}>30 minutos (Recomendado)</option>
-                <option value={45}>45 minutos</option>
-                <option value={60}>1 hora (60 minutos)</option>
+                <option value={15} className="dark:bg-slate-800">15 minutos</option>
+                <option value={30} className="dark:bg-slate-800">30 minutos (Recomendado)</option>
+                <option value={45} className="dark:bg-slate-800">45 minutos</option>
+                <option value={60} className="dark:bg-slate-800">1 hora (60 minutos)</option>
               </select>
             </div>
           </div>
@@ -469,7 +469,7 @@ export default function EventCreationForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 text-white font-semibold text-sm sm:text-base transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+          className="w-full py-3.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 text-white font-semibold text-sm sm:text-base transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer"
         >
           {loading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
